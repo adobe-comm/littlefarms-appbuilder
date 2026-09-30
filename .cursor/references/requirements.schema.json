@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentskills.io/adobe-commerce/checkout/requirements.schema.json",
+  "title": "Adobe Commerce Checkout Extension Requirements",
+  "description": "Schema for REQUIREMENTS.md - the single source of truth for checkout extension requirements. This schema defines the structure that all AI agents expect when reading or writing requirements documentation for the Checkout Starter Kit.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "summary",
+    "technicalContext",
+    "webhookContext",
+    "functionalRequirements",
+    "acceptanceCriteria"
+  ],
+  "properties": {
+    "metadata": { "$ref": "#/$defs/documentMetadata" },
+    "summary": { "$ref": "#/$defs/executiveSummary" },
+    "technicalContext": { "$ref": "#/$defs/technicalContext" },
+    "webhookContext": { "$ref": "#/$defs/webhookContext" },
+    "integrations": {
+      "type": "array",
+      "description": "External systems this extension integrates with (e.g. payment provider, shipping API, tax service)",
+      "items": { "$ref": "#/$defs/integration" }
+    },
+    "functionalRequirements": {
+      "type": "array",
+      "description": "List of functional requirements (FR-1, FR-2, etc.)",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/functionalRequirement" }
+    },
+    "businessRules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/businessRule" }
+    },
+    "acceptanceCriteria": { "$ref": "#/$defs/acceptanceCriteria" },
+    "approvals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/approval" }
+    },
+    "changelog": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/changelogEntry" }
+    }
+  },
+  "$defs": {
+    "documentMetadata": {
+      "type": "object",
+      "description": "Document control information",
+      "required": ["version", "status", "extensionName"],
+      "properties": {
+        "extensionName": { "type": "string" },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+(\\.\\d+)?$" },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "in-review", "approved", "in-development", "completed", "deprecated"]
+        },
+        "lastUpdated": { "type": "string", "format": "date" },
+        "productManager": { "type": "string" },
+        "stakeholders": { "type": "array", "items": { "type": "string" } },
+        "approvalDate": { "type": "string", "format": "date" }
+      }
+    },
+    "executiveSummary": {
+      "type": "object",
+      "description": "High-level overview of the extension",
+      "required": ["businessObjective", "priority"],
+      "properties": {
+        "businessObjective": { "type": "string" },
+        "problemStatement": { "type": "string" },
+        "proposedSolution": { "type": "string" },
+        "expectedImpact": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "metric": { "type": "string" },
+              "expectedImprovement": { "type": "string" }
+            }
+          }
+        },
+        "priority": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+        "priorityJustification": { "type": "string" },
+        "successCriteria": { "type": "array", "items": { "type": "string" } },
+        "kpis": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "metric": { "type": "string" },
+              "currentState": { "type": "string" },
+              "target": { "type": "string" },
+              "measurementMethod": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "technicalContext": {
+      "type": "object",
+      "description": "Technical environment and constraints",
+      "required": ["platform"],
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": ["paas", "saas", "both"],
+          "description": "Adobe Commerce platform type (CRITICAL for implementation)"
+        },
+        "commerceVersion": { "type": "string", "pattern": "^2\\.4\\.\\d+$" },
+        "applicationType": {
+          "type": "string",
+          "enum": ["headless", "spa", "hybrid", "traditional"]
+        },
+        "starterKit": {
+          "type": "string",
+          "description": "Starter kit identifier (e.g. 'Checkout Starter Kit')"
+        },
+        "constraints": { "type": "array", "items": { "type": "string" } },
+        "complianceRequirements": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["gdpr", "pci-dss", "hipaa", "soc2", "ccpa", "other"] }
+        }
+      }
+    },
+    "webhookContext": {
+      "type": "object",
+      "description": "Checkout webhook domain and response context. Webhook method name is confirmed in Phase 2 with Adobe documentation.",
+      "required": ["targetDomain", "responseFormat"],
+      "properties": {
+        "targetDomain": {
+          "type": "string",
+          "enum": ["payment", "shipping", "taxes", "events"],
+          "description": "Checkout domain (payment, shipping, taxes, events)"
+        },
+        "trigger": {
+          "type": "string",
+          "description": "Human-readable description of when Commerce invokes the webhook"
+        },
+        "webhookMethod": {
+          "type": "string",
+          "description": "Full webhook method name for Commerce Admin; to be confirmed in Phase 2 with Adobe docs"
+        },
+        "responseFormat": {
+          "type": "string",
+          "description": "success/error (validation) OR JSON operations array (filter/shipping/tax)"
+        }
+      }
+    },
+    "integration": {
+      "type": "object",
+      "description": "External system (e.g. payment provider, shipping carrier API, tax service)",
+      "required": ["name", "type", "purpose"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["payment", "shipping", "tax", "crm", "erp", "custom"]
+        },
+        "purpose": { "type": "string" },
+        "vendor": { "type": "string" },
+        "apiDetails": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["rest", "graphql", "soap", "webhook", "other"] },
+            "authentication": { "type": "string", "enum": ["api-key", "oauth2", "basic-auth", "none"] },
+            "documentationUrl": { "type": "string", "format": "uri" }
+          }
+        }
+      }
+    },
+    "functionalRequirement": {
+      "type": "object",
+      "description": "A single functional requirement",
+      "required": ["id", "description", "acceptanceCriteria"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^FR-\\d+$" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "userStory": { "type": "string" },
+        "webhookTrigger": {
+          "type": "object",
+          "description": "Webhook invocation context (Checkout; not Commerce events)",
+          "properties": {
+            "domain": { "type": "string", "enum": ["payment", "shipping", "taxes", "events"] },
+            "responseFormat": { "type": "string" }
+          }
+        },
+        "payloadFields": {
+          "type": "array",
+          "description": "Relevant payload fields from webhook request (from Adobe docs)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": { "type": "string" },
+              "type": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "businessLogic": { "type": "array", "items": { "type": "string" } },
+        "acceptanceCriteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "given": { "type": "string" },
+              "when": { "type": "string" },
+              "then": { "type": "string" },
+              "criterion": { "type": "string" }
+            }
+          }
+        },
+        "priority": { "type": "string", "enum": ["must-have", "should-have", "could-have", "wont-have"] }
+      }
+    },
+    "businessRule": {
+      "type": "object",
+      "required": ["id", "rule"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^BR-\\d+$" },
+        "name": { "type": "string" },
+        "rule": { "type": "string" },
+        "rationale": { "type": "string" }
+      }
+    },
+    "acceptanceCriteria": {
+      "type": "object",
+      "description": "Master acceptance criteria including phase markers",
+      "properties": {
+        "phaseMarkers": {
+          "type": "array",
+          "description": "Phase completion checklist (Phase 1, 2, 3, 5)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "phase": { "type": "string" },
+              "criterion": { "type": "string" },
+              "verified": { "type": "boolean" }
+            }
+          }
+        },
+        "functional": {
+          "type": "array",
+          "items": { "type": "object", "properties": { "criterion": { "type": "string" }, "verified": { "type": "boolean" } } }
+        },
+        "technical": {
+          "type": "array",
+          "items": { "type": "object", "properties": { "criterion": { "type": "string" }, "verified": { "type": "boolean" } } }
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "properties": {
+        "role": { "type": "string" },
+        "name": { "type": "string" },
+        "date": { "type": "string", "format": "date" }
+      }
+    },
+    "changelogEntry": {
+      "type": "object",
+      "required": ["version", "date", "changes"],
+      "properties": {
+        "version": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "author": { "type": "string" },
+        "changes": { "type": "string" }
+      }
+    }
+  }
+}

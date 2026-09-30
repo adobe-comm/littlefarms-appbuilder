@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentskills.io/adobe-commerce/checkout/architecture.schema.json",
+  "title": "Adobe Commerce Checkout Extension Architecture",
+  "description": "Schema for ARCHITECTURE.md - the single source of truth for checkout extension architecture decisions. Created by the Architect skill after REQUIREMENTS.md is approved. This schema defines the structure that all AI agents expect when reading or writing architecture documentation for the Checkout Starter Kit.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "environment",
+    "webhookValidationTable",
+    "componentArchitecture",
+    "configurationImpact",
+    "securityArchitecture",
+    "dataFlow",
+    "decisionsLog"
+  ],
+  "properties": {
+    "metadata": { "$ref": "#/$defs/documentMetadata" },
+    "environment": { "$ref": "#/$defs/environment" },
+    "webhookValidationTable": {
+      "type": "array",
+      "description": "REQUIRED. Webhook Validation Table: one entry per domain. All REQUIRED fields must be verified with Adobe documentation before Phase 3 approval. Each entry conforms to webhook-validation.schema.json.",
+      "minItems": 1,
+      "items": { "$ref": "https://agentskills.io/adobe-commerce/checkout/webhook-validation.schema.json" }
+    },
+    "componentArchitecture": { "$ref": "#/$defs/componentArchitecture" },
+    "configurationImpact": { "$ref": "#/$defs/configurationImpact" },
+    "securityArchitecture": { "$ref": "#/$defs/securityArchitecture" },
+    "dataFlow": { "$ref": "#/$defs/dataFlow" },
+    "decisionsLog": {
+      "type": "array",
+      "description": "Architectural decisions with rationale (AD-1, AD-2, etc.)",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/architecturalDecision" }
+    },
+    "approvals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/approval" }
+    },
+    "changelog": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/changelogEntry" }
+    }
+  },
+  "$defs": {
+    "documentMetadata": {
+      "type": "object",
+      "required": ["version", "status", "extensionName", "requirementsSource"],
+      "properties": {
+        "extensionName": { "type": "string" },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+(\\.\\d+)?$" },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "in-review", "approved", "in-development", "completed", "deprecated"]
+        },
+        "lastUpdated": { "type": "string", "format": "date" },
+        "architect": { "type": "string" },
+        "requirementsSource": { "type": "string" },
+        "approvalDate": { "type": "string", "format": "date" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": ["platform", "applicationType"],
+      "properties": {
+        "platform": { "type": "string", "enum": ["paas", "saas", "both"] },
+        "applicationType": { "type": "string", "enum": ["headless", "spa", "hybrid"] },
+        "commerceVersion": { "type": "string", "pattern": "^2\\.4\\.\\d+$" },
+        "runtime": { "type": "string", "description": "e.g. Node.js 22" },
+        "starterKit": { "type": "string", "description": "Checkout Starter Kit" },
+        "additionalConstraints": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "componentArchitecture": {
+      "type": "object",
+      "description": "Runtime actions and optional state/scheduled (Checkout: single-file webhook actions)",
+      "required": ["runtimeActions"],
+      "properties": {
+        "runtimeActions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/checkoutWebhookAction" }
+        },
+        "stateManagement": {
+          "type": "array",
+          "description": "Optional state storage (e.g. idempotency)",
+          "items": { "$ref": "#/$defs/stateEntry" }
+        },
+        "scheduledActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scheduledAction" }
+        }
+      }
+    },
+    "checkoutWebhookAction": {
+      "type": "object",
+      "description": "A single-file webhook action (Checkout pattern: one file per domain)",
+      "required": ["name", "path", "purpose", "responseFormat"],
+      "properties": {
+        "name": { "type": "string", "description": "Action identifier (e.g. shipping-methods)" },
+        "path": { "type": "string", "description": "Path to single entry file (e.g. actions/shipping-methods/index.js)" },
+        "purpose": { "type": "string" },
+        "responseFormat": {
+          "type": "string",
+          "description": "success/error (validation) OR JSON operations array (filter/shipping/tax)"
+        },
+        "singleFilePattern": {
+          "type": "string",
+          "description": "Flow summary: webhookVerify → decode body → business logic → return response"
+        },
+        "runtimeConfig": {
+          "type": "object",
+          "properties": {
+            "runtime": { "type": "string" },
+            "web": { "type": "string", "enum": ["yes", "no", "raw"] },
+            "timeout": { "type": "integer" },
+            "memory": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "stateEntry": {
+      "type": "object",
+      "required": ["keyPattern", "purpose"],
+      "properties": {
+        "keyPattern": { "type": "string" },
+        "purpose": { "type": "string" },
+        "ttl": { "type": "string" }
+      }
+    },
+    "scheduledAction": {
+      "type": "object",
+      "required": ["name", "schedule", "purpose"],
+      "properties": {
+        "name": { "type": "string" },
+        "schedule": { "type": "string" },
+        "purpose": { "type": "string" }
+      }
+    },
+    "configurationImpact": {
+      "type": "object",
+      "description": "Configuration files to create or update (app.config.yaml, domain YAMLs, .env, onboarding script order)",
+      "properties": {
+        "filesToUpdate": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["file", "action"],
+            "properties": {
+              "file": { "type": "string", "description": "e.g. app.config.yaml, payment-methods.yaml, shipping-carriers.yaml, tax-integrations.yaml, .env" },
+              "action": { "type": "string", "enum": ["create", "update", "verify"] },
+              "details": { "type": "string" }
+            }
+          }
+        },
+        "updateOrder": {
+          "type": "string",
+          "description": "Order: app.config.yaml → domain YAML → .env (from env.dist) → run onboarding script → action code"
+        },
+        "environmentVariables": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "purpose": { "type": "string" },
+              "required": { "type": "boolean" }
+            }
+          }
+        },
+        "npmDependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "package": { "type": "string" },
+              "purpose": { "type": "string" },
+              "version": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "securityArchitecture": {
+      "type": "object",
+      "description": "Security design for checkout webhook actions (dual: OAuth + signature)",
+      "required": ["authentication", "webhookValidation"],
+      "properties": {
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "method": { "type": "string", "description": "e.g. IMS OAuth for SaaS, require-adobe-auth in app.config" },
+            "credentials": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "webhookValidation": {
+          "type": "object",
+          "description": "Webhook signature and validation (not Commerce events)",
+          "properties": {
+            "signatureVerification": { "type": "boolean", "description": "HMAC using COMMERCE_WEBHOOKS_PUBLIC_KEY" },
+            "timestampValidation": { "type": "boolean" }
+          }
+        },
+        "secretsManagement": {
+          "type": "object",
+          "properties": {
+            "localDev": { "type": "string", "description": "e.g. .env from env.dist, gitignored" },
+            "production": { "type": "string" }
+          }
+        },
+        "dataProtection": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "dataFlow": {
+      "type": "object",
+      "description": "Webhook flow: Commerce → webhook → action → response",
+      "properties": {
+        "description": { "type": "string" },
+        "mermaidDiagram": { "type": "string", "description": "Mermaid sequence or graph (webhook flow, not validator/transformer/sender)" }
+      }
+    },
+    "architecturalDecision": {
+      "type": "object",
+      "required": ["id", "decision", "rationale"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^AD-\\d+$" },
+        "decision": { "type": "string" },
+        "rationale": { "type": "string" },
+        "alternativesConsidered": { "type": "array", "items": { "type": "string" } },
+        "relatedRequirement": { "type": "string" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "properties": {
+        "role": { "type": "string" },
+        "name": { "type": "string" },
+        "date": { "type": "string", "format": "date" }
+      }
+    },
+    "changelogEntry": {
+      "type": "object",
+      "required": ["version", "date", "author", "changes"],
+      "properties": {
+        "version": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "author": { "type": "string" },
+        "changes": { "type": "string" }
+      }
+    }
+  }
+}

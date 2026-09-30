@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentskills.io/adobe-commerce/checkout/webhook-validation.schema.json",
+  "title": "Checkout Webhook Validation Table",
+  "description": "Required structure for Phase 2 Webhook Validation Table. All REQUIRED fields must be verified with Adobe documentation.",
+  "type": "object",
+  "required": [
+    "targetDomain",
+    "webhookMethodName",
+    "webhookType",
+    "documentationSource"
+  ],
+  "properties": {
+    "targetDomain": {
+      "type": "string",
+      "enum": ["payment", "shipping", "taxes", "events"],
+      "description": "Checkout domain"
+    },
+    "actionFile": {
+      "type": "string",
+      "description": "Path e.g. actions/<domain>/index.js"
+    },
+    "webhookMethodName": {
+      "type": "string",
+      "description": "REQUIRED - Full method name for Commerce Admin (from Adobe docs)"
+    },
+    "webhookType": {
+      "type": "string",
+      "enum": ["before", "after"],
+      "description": "REQUIRED - before or after (from Adobe docs)"
+    },
+    "responseFormat": {
+      "type": "string",
+      "description": "success/error OR JSON operations array"
+    },
+    "required": {
+      "type": "string",
+      "enum": ["Optional", "Required"],
+      "description": "Commerce Admin Required field - implications for empty results"
+    },
+    "loggingHeaders": {
+      "type": "string",
+      "description": "e.g. x-ow-extra-logging: on"
+    },
+    "documentationSource": {
+      "type": "string",
+      "description": "REQUIRED - Adobe documentation URL or MCP reference"
+    }
+  }
+}
