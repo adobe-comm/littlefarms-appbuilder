@@ -501,6 +501,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
   const [categories, setCategories] = useState<CategoryChoice[]>([]);
   const [loadingPresets, setLoadingPresets] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [flushingCache, setFlushingCache] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [matched, setMatched] = useState<ProductChoice[]>([]);
   const [message, setMessage] = useState("");
@@ -535,6 +536,18 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
       setMessage(error instanceof Error ? error.message : "Unable to load saved conditions.");
     } finally {
       setLoadingPresets(false);
+    }
+  }
+
+  async function flushStorefrontCache() {
+    setFlushingCache(true);
+    try {
+      await invoke("block-cache-flush", {});
+      setMessage("Storefront caches cleared (condition SKU results and PDP evaluation).");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to flush storefront cache.");
+    } finally {
+      setFlushingCache(false);
     }
   }
 
@@ -851,17 +864,26 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
     <main className="conditional-blocks">
       <header className="page-header list-header">
         <h1>Blocks</h1>
-        <button
-          type="button"
-          className="btn-continue"
-          onClick={() => {
-            resetEditor();
-            setBlockTypeId(BLOCK_TYPE_FEATURED_RECOMMENDED);
-            setView({ screen: "type-select" });
-          }}
-        >
-          Add New Block
-        </button>
+        <div className="list-header-actions">
+          <button
+            type="button"
+            onClick={() => void flushStorefrontCache()}
+            disabled={flushingCache}
+          >
+            {flushingCache ? "Flushing…" : "Flush storefront cache"}
+          </button>
+          <button
+            type="button"
+            className="btn-continue"
+            onClick={() => {
+              resetEditor();
+              setBlockTypeId(BLOCK_TYPE_FEATURED_RECOMMENDED);
+              setView({ screen: "type-select" });
+            }}
+          >
+            Add New Block
+          </button>
+        </div>
       </header>
       {message && <p className="message" role="status">{message}</p>}
 

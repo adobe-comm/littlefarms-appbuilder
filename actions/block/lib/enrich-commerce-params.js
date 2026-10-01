@@ -30,7 +30,8 @@ async function resolveCommerceCoreGraphqlUrl (params) {
   }
 
   await ensureBusinessConfigSchema()
-  const result = await getConfigurationByKey(CONFIG_KEY, GLOBAL_SCOPE)
+  const encryptionKey = String(params.AIO_COMMERCE_CONFIG_ENCRYPTION_KEY || '').trim() || undefined
+  const result = await getConfigurationByKey(CONFIG_KEY, GLOBAL_SCOPE, { encryptionKey })
   const value = result?.config?.value
   if (typeof value === 'string' && value.trim()) {
     return value.trim()

@@ -1,0 +1,45 @@
+type LittleFarmsBrandItem {
+  image: String
+  name: String!
+  link: String!
+}
+
+type LittleFarmsBrandsListPayload {
+  url: String
+  items: [LittleFarmsBrandItem!]!
+}
+
+type LittleFarmsFeaturedPayload {
+  aggregator: String!
+  matchValue: Boolean!
+  productsToDisplay: Int!
+  conditionsJson: String!
+  productSkus: [String!]!
+  productSkusStatus: String
+}
+
+type LittleFarmsPlacementPayload {
+  priority: Int!
+  title: String
+  contentHtml: String
+  targetSkus: [String!]!
+}
+
+type LittleFarmsBlock {
+  id: ID!
+  name: String!
+  blockType: String!
+  enabled: Boolean!
+  brandsList: LittleFarmsBrandsListPayload
+  featuredRecommended: LittleFarmsFeaturedPayload
+  placement: LittleFarmsPlacementPayload
+}
+
+extend type Query {
+  littleFarmsBlock(id: ID!): LittleFarmsBlock
+  littleFarmsBlocks(
+    blockType: String
+    sku: String
+    storeViewCode: String
+  ): [LittleFarmsBlock!]!
+}

@@ -457,10 +457,21 @@ body {
 
 .list-header {
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .list-header h1 {
   margin: 0;
+}
+
+.list-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .btn-continue {

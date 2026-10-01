@@ -15,10 +15,19 @@ async function createEvalCache (params, stateFactory = stateLib.init) {
     key: cacheKey,
     async get (storeViewCode, sku) {
       const result = await state.get(cacheKey(storeViewCode, sku))
-      return result?.value ?? null
+      const raw = result?.value
+      if (raw == null || raw === '') return null
+      if (typeof raw === 'string') {
+        try {
+          return JSON.parse(raw)
+        } catch {
+          return null
+        }
+      }
+      return raw
     },
     put: (storeViewCode, sku, value) =>
-      state.put(cacheKey(storeViewCode, sku), value, { ttl }),
+      state.put(cacheKey(storeViewCode, sku), JSON.stringify(value), { ttl }),
     invalidate: storeViewCode =>
       state.deleteAll({ match: storeViewCode === '*' ? 'eval.*' : `eval.${encode(storeViewCode)}.*` })
   }

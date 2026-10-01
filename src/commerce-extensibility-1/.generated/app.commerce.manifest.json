@@ -5,8 +5,7 @@
       "description": "Manage Little Farms features such as content blocks and brands.",
       "id": "blocks_management",
       "label": "Little Farms Admin",
-      "pageTitle": "Little Farms Admin",
-      "parentMenu": "content"
+      "pageTitle": "Little Farms Admin"
     }
   },
   "businessConfig": {
@@ -28,6 +27,6 @@
     "displayName": "Little Farms Admin",
     "id": "littlefarms-blocks",
     "upgradeMode": "manual",
-    "version": "1.0.1"
+    "version": "1.0.2"
   }
 }

@@ -1,14 +1,15 @@
 # LittleFarms Blocks — Storefront & API Mesh Contract
 
-Headless consumers (EDS, API Mesh, storefront servers) must **not** use Admin IMS tokens or call `block-condition-*` actions. Use the storefront actions below with a shared secret held only on the server / mesh.
+Headless consumers (EDS, API Mesh, storefront servers) must **not** use Admin IMS tokens or call `block-condition-*` actions.
 
 ## Security
 
-| Header | Value |
-|--------|--------|
-| `x-conditional-block-secret` | Same as App Builder `EVALUATE_SHARED_SECRET` |
+| Action | Auth |
+|--------|------|
+| **`block-storefront`** (list / get presets) | **Public** — no secret; only **enabled** presets are returned |
+| **`block-evaluate`** (PDP placement) | **`x-conditional-block-secret`** = App Builder `EVALUATE_SHARED_SECRET` |
 
-The shopper browser must never receive this secret. API Mesh stores it in mesh environment variables (see [`../api-mesh/sample.env`](../api-mesh/sample.env)).
+Browsers should call **API Mesh GraphQL**, not App Builder URLs directly. Mesh holds the evaluate secret for placement queries only ([`../api-mesh/`](../api-mesh/)).
 
 ---
 
@@ -21,21 +22,22 @@ Used for **Brands List**, **Featured/Recommended** presets created in Blocks Man
 ```http
 POST /api/v1/web/littlefarms-appbuilder/block-storefront
 Content-Type: application/json
-x-conditional-block-secret: <EVALUATE_SHARED_SECRET>
 
-{"operation":"list"}
+{"operation":"list","resolveConditions":true}
 ```
 
 Optional filter:
 
 ```json
-{"operation":"list","blockType":"littlefarms_brands_list"}
+{"operation":"list","blockType":"littlefarms_brands_list","resolveConditions":true}
 ```
+
+Set `"resolveConditions":false` to return block metadata only (no Commerce SKU resolution).
 
 ### Get one block
 
 ```json
-{"operation":"get","id":"<preset-uuid>"}
+{"operation":"get","id":"<preset-uuid>","resolveConditions":true}
 ```
 
 ### Response shapes
@@ -74,13 +76,16 @@ Optional filter:
       "aggregator": "all",
       "matchValue": true,
       "productsToDisplay": 12,
-      "conditionsJson": "[{\"attribute\":\"category_id\",\"operator\":\"eq\",\"value\":\"42\"}]"
+      "conditionsJson": "[{\"attribute\":\"category_id\",\"operator\":\"eq\",\"value\":\"42\"}]",
+      "productSkus": ["SKU-1", "SKU-2"]
     }
   }
 }
 ```
 
-Disabled or unknown blocks return **404** on get. Unauthorized returns **401**.
+For **`littlefarms_featured_recommended`**, when `resolveConditions` is true (default), the action evaluates conditions against Commerce (same logic as Admin **Fetch SKUs**), returns matching SKUs in **`productSkus`**, and caches the SKU list in **App Builder State** for **`PRESET_RESULT_CACHE_TTL`** seconds (default **600** / 10 minutes). Cache for a block is cleared when the block is saved or deleted, or when an admin runs **`block-cache-flush`**.
+
+Disabled or unknown blocks return **404** on get.
 
 ---
 
@@ -132,17 +137,18 @@ An unknown SKU, no match, or a Catalog Service failure returns HTTP 200 with `{"
 
 ## 3. API Mesh / EDS GraphQL
 
-Deploy the mesh extension in [`../api-mesh/`](../api-mesh/) to expose:
+Deploy the mesh in [`../api-mesh/`](../api-mesh/) to expose blocks-only GraphQL (REST → GraphQL). **No Commerce catalog** in this mesh config for now.
 
 ```graphql
 extend type Query {
   littleFarmsBlock(id: ID!): LittleFarmsBlock
-  littleFarmsBlocks(blockType: String): [LittleFarmsBlock!]!
-  littleFarmsConditionalBlocks(sku: String!, storeViewCode: String!): [LittleFarmsConditionalBlock!]!
+  littleFarmsBlocks(blockType: String, sku: String, storeViewCode: String): [LittleFarmsBlock!]!
 }
 ```
 
-EDS queries the **unified mesh endpoint** (Commerce + LittleFarms fields in one request). Setup steps are in [`../api-mesh/README.md`](../api-mesh/README.md).
+PDP rules use the same `LittleFarmsBlock` type with `blockType: "littlefarms_placement"` and `placement { … }`. Pass `sku` and `storeViewCode` on `littleFarmsBlocks` for placements; omit them for Admin presets.
+
+Use the mesh endpoint for block fields; use Commerce GraphQL separately for `products` until you merge sources. Setup: [`../api-mesh/README.md`](../api-mesh/README.md).
 
 ---
 
@@ -150,7 +156,9 @@ EDS queries the **unified mesh endpoint** (Commerce + LittleFarms fields in one 
 
 | Variable | Used by |
 |----------|---------|
-| `EVALUATE_SHARED_SECRET` | `block-storefront`, `block-evaluate` |
+| `EVALUATE_SHARED_SECRET` | `block-evaluate` (storefront list/get is public) |
+| `include-ims-credentials: true` | Any action that calls `@adobe/aio-lib-db` via `Core.AuthClient.generateAccessToken` — injects `__ims_oauth_s2s` at runtime (including public `block-storefront` / `block-evaluate`; does **not** require caller OAuth) |
+| `IMS_CLIENT_ID` | Commerce GraphQL `x-api-key` where catalog calls need it (alongside annotation above) |
 | `DB_REGION` | `block-storefront` (presets DB) |
 | `COMMERCE_GRAPHQL_URL` + IMS | `block-evaluate` (catalog) |
 | `COMMERCE_CORE_GRAPHQL_URL` / App Management config | Scope / environment id for presets |

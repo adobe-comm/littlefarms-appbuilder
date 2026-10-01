@@ -2,15 +2,47 @@
   "meshConfig": {
     "sources": [
       {
-        "name": "Commerce",
+        "name": "Stub",
         "handler": {
-          "graphql": {
-            "endpoint": "{{env.COMMERCE_ENDPOINT}}"
+          "JsonSchema": {
+            "baseUrl": "https://jsonplaceholder.typicode.com",
+            "operations": [
+              {
+                "type": "Query",
+                "field": "lfMeshStub",
+                "path": "/posts/1",
+                "method": "GET"
+              }
+            ],
+            "operationHeaders": {
+              "x-lf-storefront-url": "{context.secrets.LITTLEFARMS_BLOCK_STOREFRONT_URL}",
+              "x-lf-evaluate-url": "{context.secrets.LITTLEFARMS_BLOCK_EVALUATE_URL}",
+              "x-lf-shared-secret": "{context.secrets.EVALUATE_SHARED_SECRET}"
+            }
           }
         }
       }
     ],
-    "additionalTypeDefs": ["./typeDefs.graphql"],
-    "additionalResolvers": ["./resolvers.js"]
+    "additionalTypeDefs": ["./schema.graphql"],
+    "additionalResolvers": ["./resolvers.js"],
+    "responseConfig": {
+      "CORS": {
+        "origin": [
+          "https://www.littlefarms.com",
+          "https://littlefarms.com",
+          "http://localhost:3000",
+          "http://localhost:8080"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allowedHeaders": [
+          "Content-Type",
+          "Authorization",
+          "origin",
+          "apollographql-client-name"
+        ],
+        "maxAge": 86400,
+        "credentials": false
+      }
+    }
   }
 }

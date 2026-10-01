@@ -1,4 +1,8 @@
-const { BLOCK_TYPE_BRANDS_LIST, DEFAULT_BLOCK_TYPE } = require('./constants')
+const {
+  BLOCK_TYPE_BRANDS_LIST,
+  BLOCK_TYPE_PLACEMENT,
+  DEFAULT_BLOCK_TYPE
+} = require('./constants')
 
 /** Storefront-safe block payload for EDS / API Mesh (no internal DB fields). */
 function toPublicBlock (preset) {
@@ -8,7 +12,8 @@ function toPublicBlock (preset) {
     id: preset.id,
     name: preset.name,
     blockType,
-    enabled: preset.enabled !== false
+    enabled: preset.enabled !== false,
+    placement: null
   }
 
   if (blockType === BLOCK_TYPE_BRANDS_LIST) {
@@ -33,9 +38,30 @@ function toPublicBlock (preset) {
       aggregator: preset.logic?.aggregator || 'all',
       matchValue: preset.logic?.matchValue !== false,
       productsToDisplay: Number(preset.logic?.productsToDisplay) || 10,
-      conditionsJson: JSON.stringify(preset.logic?.conditions || [])
+      conditionsJson: JSON.stringify(preset.logic?.conditions || []),
+      productSkus: [],
+      productSkusStatus: 'pending'
     }
   }
 }
 
-module.exports = { toPublicBlock }
+/** PDP placement rule (block-evaluate) in the same storefront shape as presets. */
+function toPublicPlacementBlock (entry) {
+  if (!entry) return null
+  return {
+    id: entry.id,
+    name: entry.name,
+    blockType: BLOCK_TYPE_PLACEMENT,
+    enabled: true,
+    brandsList: null,
+    featuredRecommended: null,
+    placement: {
+      priority: Number(entry.priority) || 0,
+      title: entry.title || '',
+      contentHtml: entry.contentHtml || '',
+      targetSkus: Array.isArray(entry.targetSkus) ? entry.targetSkus : []
+    }
+  }
+}
+
+module.exports = { toPublicBlock, toPublicPlacementBlock }

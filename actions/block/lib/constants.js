@@ -4,12 +4,16 @@ const OPERATORS = ['eq', 'neq', 'in', 'nin', 'gt', 'gte', 'lt', 'lte']
 const NUMERIC_OPERATORS = ['gt', 'gte', 'lt', 'lte']
 const DEFAULT_PRIORITY = 100
 const DEFAULT_CACHE_TTL = 300
+/** Storefront preset condition → SKU list cache (App Builder State). */
+const DEFAULT_PRESET_RESULT_CACHE_TTL = 600
 const MAX_LIST_VALUES = 500
 const MAX_GROUP_DEPTH = 3
 const DEFAULT_PRODUCTS_TO_DISPLAY = 10
 const MAX_PRODUCTS_TO_DISPLAY = 50
 const DEFAULT_BLOCK_TYPE = 'littlefarms_featured_recommended'
 const BLOCK_TYPE_BRANDS_LIST = 'littlefarms_brands_list'
+/** Storefront / mesh blockType for PDP placement rules (conditional_blocks), not an Admin preset type. */
+const BLOCK_TYPE_PLACEMENT = 'littlefarms_placement'
 const BLOCK_TYPES = [DEFAULT_BLOCK_TYPE, BLOCK_TYPE_BRANDS_LIST]
 const MAX_BRAND_ITEMS = 50
 
@@ -20,12 +24,14 @@ module.exports = {
   NUMERIC_OPERATORS,
   DEFAULT_PRIORITY,
   DEFAULT_CACHE_TTL,
+  DEFAULT_PRESET_RESULT_CACHE_TTL,
   MAX_LIST_VALUES,
   MAX_GROUP_DEPTH,
   DEFAULT_PRODUCTS_TO_DISPLAY,
   MAX_PRODUCTS_TO_DISPLAY,
   DEFAULT_BLOCK_TYPE,
   BLOCK_TYPE_BRANDS_LIST,
+  BLOCK_TYPE_PLACEMENT,
   BLOCK_TYPES,
   MAX_BRAND_ITEMS
 }

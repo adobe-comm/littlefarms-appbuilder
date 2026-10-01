@@ -4,7 +4,7 @@ export default defineConfig({
   metadata: {
     id: 'littlefarms-blocks',
     displayName: 'Little Farms Admin',
-    version: '1.0.1',
+    version: '1.0.2',
     description: 'Blocks, brands, and other Little Farms admin tools.'
   },
   adminUi: {
@@ -13,7 +13,7 @@ export default defineConfig({
       label: 'Little Farms Admin',
       pageTitle: 'Little Farms Admin',
       description: 'Manage Little Farms features such as content blocks and brands.',
-      parentMenu: 'content',
+      // Omit parentMenu — Admin UI SDK V2 nests the app under **Apps** (displayName section).
       aclProtected: true
     }
   },

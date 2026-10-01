@@ -18,7 +18,7 @@ async function main (params) {
     const transformed = transform(params, validation)
     const prepared = await preProcess(transformed, params)
     const result = await send(prepared, params)
-    return { statusCode: 200, body: await postProcess(result, prepared) }
+    return { statusCode: 200, body: await postProcess(result, prepared, params) }
   } catch (error) {
     logger.error(error)
     return errorResponse(error.statusCode || 503, error.message || 'Server error.', logger)

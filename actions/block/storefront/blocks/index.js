@@ -1,9 +1,11 @@
 const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
-const { validateStorefrontSecret } = require('../../lib/storefront-auth')
+const { validateStorefrontSecretUnlessPublicPresetRead } = require('../../lib/storefront-auth')
 const { createPresetStore } = require('../../lib/preset-store')
 const { withCommerceCoreGraphqlUrl } = require('../../lib/enrich-commerce-params')
-const { toPublicBlock } = require('../../lib/public-preset')
+const { enrichPresetForStorefront, enrichPresetsForStorefront } = require('../../lib/enrich-storefront-blocks')
+const { createPresetResultCache } = require('../../lib/preset-result-cache')
+const { createAttributeCatalog } = require('../../lib/attribute-catalog')
 const { DEFAULT_BLOCK_TYPE } = require('../../lib/constants')
 
 async function main (params) {
@@ -12,7 +14,7 @@ async function main (params) {
   try {
     params = await withCommerceCoreGraphqlUrl(params)
 
-    const auth = validateStorefrontSecret(params)
+    const auth = validateStorefrontSecretUnlessPublicPresetRead(params)
     if (!auth.valid) {
       return errorResponse(auth.statusCode, auth.error, logger)
     }
@@ -31,7 +33,13 @@ async function main (params) {
       if (preset.scope?.environmentId !== scope.environmentId) {
         return errorResponse(404, 'Block not found.', logger)
       }
-      return { statusCode: 200, body: { block: toPublicBlock(preset) } }
+      const context = {
+        logger,
+        cache: await createPresetResultCache(params),
+        catalog: createAttributeCatalog(params)
+      }
+      const block = await enrichPresetForStorefront(preset, params, context)
+      return { statusCode: 200, body: { block } }
     }
 
     let presets = await store.list(scope)
@@ -41,9 +49,10 @@ async function main (params) {
       presets = presets.filter(preset => (preset.blockType || DEFAULT_BLOCK_TYPE) === blockType)
     }
 
+    const blocks = await enrichPresetsForStorefront(presets, params, logger)
     return {
       statusCode: 200,
-      body: { blocks: presets.map(toPublicBlock) }
+      body: { blocks }
     }
   } catch (error) {
     logger.error(error)
