@@ -1,5 +1,6 @@
 const { createAttributeCatalog } = require('./attribute-catalog')
 const { createPresetResultCache } = require('./preset-result-cache')
+const { presetCacheKey } = require('./preset-store')
 const { BLOCK_TYPE_BRANDS_LIST, DEFAULT_BLOCK_TYPE } = require('./constants')
 
 function presetToMatchRule (preset) {
@@ -22,9 +23,10 @@ async function resolveConditionResultSkus (preset, params, options = {}) {
     return []
   }
 
+  const cacheKey = presetCacheKey(preset)
   const cache = options.cache || await createPresetResultCache(params)
   if (!options.skipCache) {
-    const cached = await cache.get(preset.id)
+    const cached = await cache.get(cacheKey)
     if (Array.isArray(cached?.skus)) {
       return cached.skus
     }
@@ -36,9 +38,9 @@ async function resolveConditionResultSkus (preset, params, options = {}) {
 
   if (skus.length > 0) {
     try {
-      await cache.put(preset.id, { skus, cachedAt: Date.now() })
+      await cache.put(cacheKey, { skus, cachedAt: Date.now() })
     } catch (cacheError) {
-      options.logger?.warn?.(`Preset SKU cache write failed for ${preset.id}: ${cacheError.message}`)
+      options.logger?.warn?.(`Preset SKU cache write failed for block ${cacheKey}: ${cacheError.message}`)
     }
   }
   return skus

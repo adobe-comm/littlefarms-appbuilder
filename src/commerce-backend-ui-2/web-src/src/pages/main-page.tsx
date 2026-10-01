@@ -50,6 +50,7 @@ type SavedCondition = {
   name: string;
   blockType?: string;
   enabled?: boolean;
+  blockId?: number;
   sequence?: number;
   logic: Rule | BrandsListLogic | Record<string, unknown>;
   createdAt?: string;
@@ -137,9 +138,17 @@ function formatCreatedAt(iso?: string): string {
   });
 }
 
+function presetLookupId(preset: SavedCondition): string {
+  if (preset.blockId) return String(preset.blockId);
+  if (/^\d+$/.test(preset.id)) return preset.id;
+  return preset.id;
+}
+
 function displayBlockId(preset: SavedCondition): string {
+  const lookup = presetLookupId(preset);
+  if (preset.blockId || /^\d+$/.test(preset.id)) return lookup;
   if (preset.sequence) return String(preset.sequence);
-  return preset.id.slice(0, 8);
+  return lookup.slice(0, 8);
 }
 
 function actionUrl(name: string): string {
@@ -507,7 +516,6 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
   const [message, setMessage] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
   const [page, setPage] = useState(1);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editSection, setEditSection] = useState<BlockEditSection>("frontend-properties");
 
   async function invoke(name: string, params: Record<string, unknown>) {
@@ -563,7 +571,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
 
   function openPresetForEdit(preset: SavedCondition) {
     const typeId = preset.blockType || BLOCK_TYPE_FEATURED_RECOMMENDED;
-    setPresetId(preset.id);
+    setPresetId(presetLookupId(preset));
     setBlockTypeId(typeId);
     setName(preset.name);
     setEnabled(preset.enabled !== false);
@@ -583,7 +591,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
     setMatched([]);
     setMessage("");
     setEditSection("block-options");
-    setView({ screen: "edit", blockTypeId: typeId, presetId: preset.id });
+    setView({ screen: "edit", blockTypeId: typeId, presetId: presetLookupId(preset) });
   }
 
   function buildLogicPayload() {
@@ -644,7 +652,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
     try {
       await invoke("block-condition-write", {
         preset: {
-          id: preset.id,
+          id: presetLookupId(preset),
           name: preset.name,
           enabled: preset.enabled === false,
           blockType: preset.blockType || BLOCK_TYPE_FEATURED_RECOMMENDED,
@@ -659,7 +667,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
 
   function runRowAction(preset: SavedCondition, action: string) {
     if (action === "edit") openPresetForEdit(preset);
-    if (action === "delete") void deleteBlock(preset.id);
+    if (action === "delete") void deleteBlock(presetLookupId(preset));
     if (action === "toggle") void toggleEnabled(preset);
   }
 
@@ -704,15 +712,6 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
   const totalPages = Math.max(1, Math.ceil(filteredPresets.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pagePresets = filteredPresets.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const allPageSelected = pagePresets.length > 0 && pagePresets.every(preset => selectedIds.includes(preset.id));
-
-  function toggleSelectAllOnPage() {
-    if (allPageSelected) {
-      setSelectedIds(current => current.filter(id => !pagePresets.some(preset => preset.id === id)));
-      return;
-    }
-    setSelectedIds(current => [...new Set([...current, ...pagePresets.map(preset => preset.id)])]);
-  }
 
   if (view.screen === "type-select") {
     return (
@@ -911,7 +910,6 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
         <table className="blocks-grid">
           <thead>
             <tr>
-              <th><input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllOnPage} aria-label="Select all on page" /></th>
               <th>Block ID</th>
               <th>Title</th>
               <th>Created At</th>
@@ -921,23 +919,13 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
           </thead>
           <tbody>
             {loadingPresets && (
-              <tr><td colSpan={6}>Loading…</td></tr>
+              <tr><td colSpan={5}>Loading…</td></tr>
             )}
             {!loadingPresets && pagePresets.length === 0 && (
-              <tr><td colSpan={6}>No blocks found.</td></tr>
+              <tr><td colSpan={5}>No blocks found.</td></tr>
             )}
             {!loadingPresets && pagePresets.map(preset => (
-              <tr key={preset.id}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(preset.id)}
-                    onChange={() => setSelectedIds(current => current.includes(preset.id)
-                      ? current.filter(id => id !== preset.id)
-                      : [...current, preset.id])}
-                    aria-label={`Select ${preset.name}`}
-                  />
-                </td>
+              <tr key={presetLookupId(preset)}>
                 <td>{displayBlockId(preset)}</td>
                 <td><button type="button" className="link-button" onClick={() => openPresetForEdit(preset)}>{preset.name}</button></td>
                 <td>{formatCreatedAt(preset.createdAt || preset.updatedAt)}</td>

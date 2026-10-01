@@ -13,7 +13,7 @@ flowchart TB
   end
 
   subgraph runtime [App Builder]
-    PR[(condition_presets DB)]
+    PR[(littlefarms_blocks DB)]
     RR[(conditional_blocks rules DB)]
     EV[block-evaluate action]
     SB --> PR
@@ -40,7 +40,7 @@ Adding a future type means: register the type in both places and add a form modu
 ### 2. Saved block (condition preset) — what you use in Admin today
 
 - **What**: A named configuration a merchant saves from **Blocks Management** (product count + condition tree).
-- **Storage**: App Builder Database collection `condition_presets` (see `actions/block/lib/preset-store.js`).
+- **Storage**: App Builder Database collection `littlefarms_blocks` (see `actions/block/lib/preset-store.js`).
 - **API**: `block-condition-list`, `block-condition-write`.
 - **Purpose**: Reusable merchandising logic — “show up to N products that match these conditions.” **Fetch SKUs** previews matches via `block-metadata` (`resource: matches`).
 

@@ -20,7 +20,7 @@ Browser clients should use this mesh endpoint (with CORS); do not call App Build
 
 | Field | Purpose |
 |--------|---------|
-| `littleFarmsBlock(id)` | One saved preset by UUID (Admin) |
+| `littleFarmsBlock(blockId:)` / `id` / `title` | One preset by Admin **Block ID**, UUID, or title |
 | `littleFarmsBlocks(blockType)` | Enabled presets; optional type filter. Featured blocks include **`productSkus`** (Commerce evaluation, cached 10 min in State) |
 | `littleFarmsBlocks(sku, storeViewCode)` | PDP placement blocks (`blockType`: `littlefarms_placement`) |
 
@@ -28,14 +28,15 @@ See [`schema.graphql`](./schema.graphql) and [`meshConfig.json`](./meshConfig.js
 
 ### Examples
 
-**One block:**
+**One block (by id or title):**
 
 ```graphql
-query ($id: ID!) {
-  littleFarmsBlock(id: $id) {
+query {
+  littleFarmsBlock(blockId: 3) {
+    id
+    blockId
     name
-    blockType
-    brandsList { url items { image name link } }
+    featuredRecommended { productSkus productsToDisplay }
   }
 }
 ```
@@ -90,7 +91,7 @@ aio api-mesh status
 aio api-mesh describe
 ```
 
-**Import errors:** run commands from `api-mesh/`; keep paths like `./schema.graphql` and `./resolvers.js` in the same folder; do not use a `.graphql` file as a graphql `endpoint`.
+**Import errors:** run commands from `api-mesh/`; keep paths like `./schema.graphql` and `./resolvers.js` in the same folder; do not use a `.graphql` file as a graphql `endpoint`. The CLI minifies imported files with `jsmin` — **do not use GraphQL block strings (`"""…"""`)** in `schema.graphql` or import fails with *Unable to import the files in the mesh config*.
 
 ### Troubleshooting: `The secret LITTLEFARMS_BLOCK_STOREFRONT_URL is not available`
 

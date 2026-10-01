@@ -1,4 +1,4 @@
-const { createPresetStore } = require('../../lib/preset-store')
+const { createPresetStore, presetCacheKey, readBlockId } = require('../../lib/preset-store')
 
 async function preProcess (input, params) {
   const store = createPresetStore(params)
@@ -8,7 +8,9 @@ async function preProcess (input, params) {
     error.statusCode = 404
     throw error
   }
-  return { store, id: input.id }
+  const blockId = readBlockId(existing)
+  const id = blockId != null ? String(blockId) : String(input.id)
+  return { store, id, cacheKey: presetCacheKey(existing) }
 }
 
 module.exports = { preProcess }

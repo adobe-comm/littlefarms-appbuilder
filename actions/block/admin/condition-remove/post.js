@@ -1,10 +1,10 @@
 const { createPresetResultCache } = require('../../lib/preset-result-cache')
 
 async function postProcess (result, prepared, params) {
-  const blockId = prepared?.id || result?.id
-  if (blockId && params) {
+  const key = prepared?.cacheKey || prepared?.id || result?.id
+  if (key && params) {
     const cache = await createPresetResultCache(params)
-    await cache.invalidate(blockId)
+    await cache.invalidate(String(key))
   }
   return result
 }

@@ -36,9 +36,21 @@ Set `"resolveConditions":false` to return block metadata only (no Commerce SKU r
 
 ### Get one block
 
+By **blockId** (same number as Admin **Block ID** — preferred for storefront):
+
 ```json
-{"operation":"get","id":"<preset-uuid>","resolveConditions":true}
+{"operation":"get","blockId":3,"resolveConditions":true}
 ```
+
+Legacy request alias: `sequence`. Also: `blockNumber`. A numeric **`id`** (e.g. `"3"`) is treated as blockId.
+
+By **title** (Admin **Title** / `name`; case-insensitive):
+
+```json
+{"operation":"get","title":"Homepage > Butchery","resolveConditions":true}
+```
+
+**Response:** **`blockId`** (int) and **`id`** (same value as string, e.g. `"3"`).
 
 ### Response shapes
 

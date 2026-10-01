@@ -17,6 +17,9 @@ const BLOCK_TYPE_PLACEMENT = 'littlefarms_placement'
 const BLOCK_TYPES = [DEFAULT_BLOCK_TYPE, BLOCK_TYPE_BRANDS_LIST]
 const MAX_BRAND_ITEMS = 50
 
+/** Saved blocks (Admin presets) — App Builder Database collection. */
+const BLOCKS_COLLECTION = 'littlefarms_blocks'
+
 module.exports = {
   AGGREGATORS,
   ATTRIBUTE_CODE,
@@ -33,5 +36,6 @@ module.exports = {
   BLOCK_TYPE_BRANDS_LIST,
   BLOCK_TYPE_PLACEMENT,
   BLOCK_TYPES,
-  MAX_BRAND_ITEMS
+  MAX_BRAND_ITEMS,
+  BLOCKS_COLLECTION
 }

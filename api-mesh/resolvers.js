@@ -67,10 +67,20 @@ module.exports = {
       littleFarmsBlock: {
         resolve: function (_root, args, context) {
           var secrets = secretsFrom(context)
+          var id = String(args.id || '').trim()
+          var title = String(args.title || '').trim()
+          var blockId = args.blockId != null ? Number(args.blockId) : null
+          if (!id && !title && !(blockId > 0)) {
+            return Promise.reject(new Error('littleFarmsBlock requires blockId, id, or title.'))
+          }
+          var body = { operation: 'get', resolveConditions: true }
+          if (blockId > 0) body.blockId = blockId
+          else if (id) body.id = id
+          else body.title = title
           return postJson(
             secrets.LITTLEFARMS_BLOCK_STOREFRONT_URL,
             secrets.EVALUATE_SHARED_SECRET,
-            { operation: 'get', id: args.id, resolveConditions: true },
+            body,
             { skipSecret: true }
           ).then(function (payload) {
             var block = payload.block || null

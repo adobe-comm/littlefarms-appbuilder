@@ -8,6 +8,55 @@ const { createPresetResultCache } = require('../../lib/preset-result-cache')
 const { createAttributeCatalog } = require('../../lib/attribute-catalog')
 const { DEFAULT_BLOCK_TYPE } = require('../../lib/constants')
 
+function blockTitleFromParams (params) {
+  return String(params.title || params.name || params.blockTitle || '').trim()
+}
+
+function blockIdFromParams (params) {
+  const raw = params.blockId ?? params.sequence ?? params.blockNumber
+  if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
+    const value = Number(raw)
+    if (Number.isInteger(value) && value > 0) return value
+  }
+  return null
+}
+
+async function loadPresetForGet (store, scope, params) {
+  const blockId = blockIdFromParams(params)
+  const id = String(params.id || '').trim()
+  const title = blockTitleFromParams(params)
+  if (blockId == null && !id && !title) {
+    const error = new Error('blockId, id, or title is required.')
+    error.statusCode = 400
+    throw error
+  }
+
+  let preset = null
+  if (blockId != null) {
+    preset = await store.findByBlockId(scope, blockId)
+  } else if (id) {
+    if (/^\d+$/.test(id)) {
+      preset = await store.findByBlockId(scope, Number(id))
+    }
+    if (!preset) {
+      preset = await store.get(id)
+    }
+  } else {
+    preset = await store.findByTitle(scope, title)
+  }
+  if (!preset || preset.enabled === false) {
+    const error = new Error('Block not found.')
+    error.statusCode = 404
+    throw error
+  }
+  if (preset.scope?.environmentId !== scope.environmentId) {
+    const error = new Error('Block not found.')
+    error.statusCode = 404
+    throw error
+  }
+  return preset
+}
+
 async function main (params) {
   const logger = Core.Logger('block-storefront', { level: params.LOG_LEVEL || 'info' })
 
@@ -24,14 +73,11 @@ async function main (params) {
     const operation = String(params.operation || 'list').trim().toLowerCase()
 
     if (operation === 'get') {
-      const id = String(params.id || '').trim()
-      if (!id) return errorResponse(400, 'id is required.', logger)
-      const preset = await store.get(id)
-      if (!preset || preset.enabled === false) {
-        return errorResponse(404, 'Block not found.', logger)
-      }
-      if (preset.scope?.environmentId !== scope.environmentId) {
-        return errorResponse(404, 'Block not found.', logger)
+      let preset
+      try {
+        preset = await loadPresetForGet(store, scope, params)
+      } catch (error) {
+        return errorResponse(error.statusCode || 400, error.message, logger)
       }
       const context = {
         logger,

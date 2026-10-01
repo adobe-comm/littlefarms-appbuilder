@@ -45,7 +45,7 @@ Removed scaffolding: legacy root `web-src/`, `actions/generic/`, and the duplica
 | `block-list` / `block-write` / `block-remove` | Full **rules** for storefront PDP |
 | `block-evaluate` | Storefront: matching blocks for current SKU |
 
-Preset pipeline: `actions/block/admin/condition-*` + `lib/preset-store.js` → DB collection `condition_presets`.
+Preset pipeline: `actions/block/admin/condition-*` + `lib/preset-store.js` → DB collection `littlefarms_blocks`.
 
 Rule pipeline: `actions/block/admin/{list,write,remove}` + `lib/rules-store.js` + `lib/evaluate.js` → collection `conditional_blocks` + State cache.
 

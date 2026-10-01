@@ -3,13 +3,16 @@ const {
   BLOCK_TYPE_PLACEMENT,
   DEFAULT_BLOCK_TYPE
 } = require('./constants')
+const { readBlockId } = require('./preset-store')
 
 /** Storefront-safe block payload for EDS / API Mesh (no internal DB fields). */
 function toPublicBlock (preset) {
   if (!preset) return null
   const blockType = preset.blockType || DEFAULT_BLOCK_TYPE
+  const blockId = readBlockId(preset)
   const base = {
-    id: preset.id,
+    id: blockId != null ? String(blockId) : String(preset.id || ''),
+    blockId,
     name: preset.name,
     blockType,
     enabled: preset.enabled !== false,

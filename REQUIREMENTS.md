@@ -105,7 +105,7 @@ Register future types in `block-types/index.ts` and `actions/block/lib/constants
 
 | Data | Storage |
 |------|---------|
-| Saved blocks (presets) | App Builder Database (`condition_presets`, global scope) |
+| Saved blocks (presets) | App Builder Database (`littlefarms_blocks`, scoped by environment + store view) |
 | Merchandising rules | App Builder Database (`conditional_blocks`) |
 | Evaluate cache | App Builder State, TTL 300s |
 
@@ -129,7 +129,7 @@ Product count (1–50) and conditions builder with **Fetch SKUs** preview.
 
 ### FR-3: Persist and list saved blocks
 
-CRUD via condition actions; numeric **Block ID** (`sequence`) on save.
+CRUD via condition actions; numeric **Block ID** (`blockId`, exposed as string `id`) on save.
 
 ### FR-4: Storefront evaluation (optional)
 

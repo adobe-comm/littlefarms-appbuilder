@@ -27,6 +27,7 @@ type LittleFarmsPlacementPayload {
 
 type LittleFarmsBlock {
   id: ID!
+  blockId: Int
   name: String!
   blockType: String!
   enabled: Boolean!
@@ -36,7 +37,7 @@ type LittleFarmsBlock {
 }
 
 extend type Query {
-  littleFarmsBlock(id: ID!): LittleFarmsBlock
+  littleFarmsBlock(id: ID, title: String, blockId: Int): LittleFarmsBlock
   littleFarmsBlocks(
     blockType: String
     sku: String
