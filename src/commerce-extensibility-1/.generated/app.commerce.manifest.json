@@ -1,0 +1,19 @@
+{
+  "adminUi": {
+    "menu": {
+      "aclProtected": true,
+      "description": "Create and manage typed content blocks.",
+      "id": "blocks_management",
+      "label": "Blocks Management",
+      "pageTitle": "Blocks Management",
+      "parentMenu": "content"
+    }
+  },
+  "metadata": {
+    "description": "Blocks Management for LittleFarms content types.",
+    "displayName": "LittleFarms",
+    "id": "littlefarms-blocks",
+    "upgradeMode": "manual",
+    "version": "1.0.0"
+  }
+}

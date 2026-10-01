@@ -1,0 +1,133 @@
+web: web-src
+
+# The [pre-app-build] hooks are auto-generated. Do not remove or manually edit.
+hooks:
+  pre-app-build: >-
+    EXTENSION=backend-ui/2 npx aio-commerce-lib-app hooks pre-app-build && node -e "require('fs').rmSync('src/commerce-backend-ui-2/web-src/.babelrc', {force:true})"
+  pre-app-dev: EXTENSION=backend-ui/2 npx aio-commerce-lib-app hooks pre-app-dev
+  pre-app-run: EXTENSION=backend-ui/2 npx aio-commerce-lib-app hooks pre-app-run
+
+operations:
+  view:
+    - type: web
+      impl: index.html
+
+runtimeManifest:
+  database:
+    auto-provision: true
+    region: $DB_REGION
+  packages:
+    littlefarms-appbuilder:
+      license: Apache-2.0
+      actions:
+        block-evaluate:
+          function: ../../actions/block/storefront/evaluate/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            LOG_LEVEL: $LOG_LEVEL
+            COMMERCE_GRAPHQL_URL: $COMMERCE_GRAPHQL_URL
+            IMS_ORG_ID: $IMS_ORG_ID
+            IMS_CLIENT_ID: $IMS_CLIENT_ID
+            IMS_CLIENT_SECRETS: $IMS_CLIENT_SECRETS
+            IMS_SCOPES: $IMS_SCOPES
+            EVALUATE_SHARED_SECRET: $EVALUATE_SHARED_SECRET
+            STATE_REGION: $STATE_REGION
+            EVAL_CACHE_TTL: $EVAL_CACHE_TTL
+          limits:
+            timeout: 15000
+            memorySize: 256
+          annotations:
+            final: true
+        block-list:
+          function: ../../actions/block/admin/list/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs: &admin-inputs
+            LOG_LEVEL: $LOG_LEVEL
+            DB_REGION: $DB_REGION
+            STATE_REGION: $STATE_REGION
+          limits: &admin-limits
+            timeout: 10000
+            memorySize: 256
+          annotations: &admin-annotations
+            require-adobe-auth: true
+            final: true
+            include-ims-credentials: true
+        block-metadata:
+          function: ../../actions/block/admin/metadata/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+            COMMERCE_CORE_GRAPHQL_URL: $COMMERCE_CORE_GRAPHQL_URL
+            MAGENTO_STORE_CODE: $MAGENTO_STORE_CODE
+            MAGENTO_WEBSITE_CODE: $MAGENTO_WEBSITE_CODE
+            MAGENTO_ENVIRONMENT_ID: $MAGENTO_ENVIRONMENT_ID
+            MAGENTO_CUSTOMER_GROUP: $MAGENTO_CUSTOMER_GROUP
+            MAGENTO_API_KEY: $MAGENTO_API_KEY
+            IMS_ORG_ID: $IMS_ORG_ID
+            IMS_CLIENT_ID: $IMS_CLIENT_ID
+            IMS_CLIENT_SECRETS: $IMS_CLIENT_SECRETS
+            IMS_SCOPES: $IMS_SCOPES
+          limits:
+            timeout: 15000
+            memorySize: 256
+          annotations:
+            <<: *admin-annotations
+        block-condition-list:
+          function: ../../actions/block/admin/condition-list/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+            COMMERCE_CORE_GRAPHQL_URL: $COMMERCE_CORE_GRAPHQL_URL
+            MAGENTO_ENVIRONMENT_ID: $MAGENTO_ENVIRONMENT_ID
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        block-condition-write:
+          function: ../../actions/block/admin/condition-write/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+            COMMERCE_CORE_GRAPHQL_URL: $COMMERCE_CORE_GRAPHQL_URL
+            MAGENTO_ENVIRONMENT_ID: $MAGENTO_ENVIRONMENT_ID
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        block-condition-remove:
+          function: ../../actions/block/admin/condition-remove/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+            COMMERCE_CORE_GRAPHQL_URL: $COMMERCE_CORE_GRAPHQL_URL
+            MAGENTO_ENVIRONMENT_ID: $MAGENTO_ENVIRONMENT_ID
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        block-write:
+          function: ../../actions/block/admin/write/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        block-remove:
+          function: ../../actions/block/admin/remove/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations

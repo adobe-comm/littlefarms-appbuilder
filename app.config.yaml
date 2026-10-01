@@ -1,17 +1,10 @@
+extensions:
+  commerce/extensibility/1:
+    $include: src/commerce-extensibility-1/ext.config.yaml
+  commerce/backend-ui/2:
+    $include: src/commerce-backend-ui-2/ext.config.yaml
 application:
-  actions: actions
-  web: web-src
   runtimeManifest:
-    packages:
-      littlefarms-appbuilder:
-        license: Apache-2.0
-        actions:
-          generic:
-            function: actions/generic/index.js
-            web: 'yes'
-            runtime: nodejs:22
-            inputs:
-              LOG_LEVEL: debug
-            annotations:
-              require-adobe-auth: true
-              final: true
+    database:
+      auto-provision: false
+      region: amer
