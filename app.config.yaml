@@ -1,10 +1,15 @@
 extensions:
   commerce/extensibility/1:
     $include: src/commerce-extensibility-1/ext.config.yaml
+
+  # This extension is required for business configuration. Do not remove.
+  commerce/configuration/1:
+    $include: src/commerce-configuration-1/ext.config.yaml
   commerce/backend-ui/2:
     $include: src/commerce-backend-ui-2/ext.config.yaml
 application:
   runtimeManifest:
+    packages: {}
     database:
       auto-provision: false
       region: amer

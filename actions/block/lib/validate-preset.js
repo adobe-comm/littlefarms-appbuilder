@@ -8,7 +8,9 @@ const {
   DEFAULT_PRODUCTS_TO_DISPLAY,
   MAX_PRODUCTS_TO_DISPLAY,
   DEFAULT_BLOCK_TYPE,
-  BLOCK_TYPES
+  BLOCK_TYPE_BRANDS_LIST,
+  BLOCK_TYPES,
+  MAX_BRAND_ITEMS
 } = require('./constants')
 
 function addError (errors, field, message) {
@@ -94,6 +96,72 @@ function normalizeNodes (nodes, path, depth, errors) {
   return nodes.map((node, index) => normalizeNode(node, `${path}.${index}`, depth, errors))
 }
 
+function isLikelyUrl (value) {
+  try {
+    // eslint-disable-next-line no-new
+    new URL(value)
+    return true
+  } catch {
+    return value.startsWith('/')
+  }
+}
+
+function validateFeaturedLogic (logic, errors) {
+  if (!AGGREGATORS.includes(logic.aggregator)) {
+    addError(errors, 'aggregator', 'Aggregator must be all or any.')
+  }
+  if (logic.matchValue !== undefined &&
+    ![true, false, 'true', 'false'].includes(logic.matchValue)) {
+    addError(errors, 'matchValue', 'Match value must be true or false.')
+  }
+  const displayCount = productsToDisplay(logic.productsToDisplay, errors)
+  const conditions = normalizeNodes(logic.conditions, 'conditions', 2, errors)
+  return {
+    aggregator: logic.aggregator,
+    matchValue: logic.matchValue !== false && logic.matchValue !== 'false',
+    productsToDisplay: displayCount,
+    conditions
+  }
+}
+
+function validateBrandsListLogic (logic, errors) {
+  const url = String(logic?.url ?? '').trim()
+  if (url && !isLikelyUrl(url)) {
+    addError(errors, 'url', 'URL must be a valid absolute URL or a path starting with /.')
+  }
+
+  const rawItems = Array.isArray(logic?.items) ? logic.items : []
+  if (rawItems.length === 0) {
+    addError(errors, 'items', 'Add at least one brand item.')
+    return { url, items: [] }
+  }
+  if (rawItems.length > MAX_BRAND_ITEMS) {
+    addError(errors, 'items', `A brands list can contain at most ${MAX_BRAND_ITEMS} items.`)
+  }
+
+  const items = rawItems.slice(0, MAX_BRAND_ITEMS).map((item, index) => {
+    const name = String(item?.name ?? '').trim()
+    const link = String(item?.link ?? '').trim()
+    const image = String(item?.image ?? '').trim()
+    if (!name) addError(errors, `items.${index}.name`, 'Brand name is required.')
+    if (!link) addError(errors, `items.${index}.link`, 'Brand link is required.')
+    else if (!isLikelyUrl(link)) {
+      addError(errors, `items.${index}.link`, 'Link must be a valid absolute URL or a path starting with /.')
+    }
+    if (image && !isLikelyUrl(image)) {
+      addError(errors, `items.${index}.image`, 'Image must be a valid absolute URL or a path starting with /.')
+    }
+    return { image, name, link }
+  }).filter(item => item.name || item.link || item.image)
+
+  const completeItems = items.filter(item => item.name && item.link)
+  if (completeItems.length === 0 && errors.every(error => !String(error.field).startsWith('items.'))) {
+    addError(errors, 'items', 'Add at least one brand with name and link.')
+  }
+
+  return { url, items: completeItems.length > 0 ? completeItems : items }
+}
+
 function validatePreset (input) {
   const errors = []
   const preset = input || {}
@@ -105,15 +173,13 @@ function validatePreset (input) {
   if (!BLOCK_TYPES.includes(blockType)) {
     addError(errors, 'blockType', 'Block type is not supported.')
   }
-  if (!AGGREGATORS.includes(logic.aggregator)) {
-    addError(errors, 'aggregator', 'Aggregator must be all or any.')
+
+  let normalizedLogic
+  if (blockType === BLOCK_TYPE_BRANDS_LIST) {
+    normalizedLogic = validateBrandsListLogic(logic, errors)
+  } else {
+    normalizedLogic = validateFeaturedLogic(logic, errors)
   }
-  if (logic.matchValue !== undefined &&
-    ![true, false, 'true', 'false'].includes(logic.matchValue)) {
-    addError(errors, 'matchValue', 'Match value must be true or false.')
-  }
-  const displayCount = productsToDisplay(logic.productsToDisplay, errors)
-  const conditions = normalizeNodes(logic.conditions, 'conditions', 2, errors)
 
   if (errors.length > 0) return { valid: false, errors }
 
@@ -124,12 +190,7 @@ function validatePreset (input) {
       name,
       blockType,
       enabled: preset.enabled !== false,
-      logic: {
-        aggregator: logic.aggregator,
-        matchValue: logic.matchValue !== false && logic.matchValue !== 'false',
-        productsToDisplay: displayCount,
-        conditions
-      }
+      logic: normalizedLogic
     }
   }
 }

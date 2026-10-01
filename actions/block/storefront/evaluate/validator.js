@@ -1,8 +1,9 @@
+const { validateStorefrontSecret } = require('../../lib/storefront-auth')
+
 function validate (params) {
-  const headers = params.__ow_headers || {}
-  const providedSecret = headers['x-conditional-block-secret'] || params.sharedSecret
-  if (!params.EVALUATE_SHARED_SECRET || providedSecret !== params.EVALUATE_SHARED_SECRET) {
-    return { valid: false, statusCode: 401, error: 'Unauthorized.' }
+  const secretCheck = validateStorefrontSecret(params)
+  if (!secretCheck.valid) {
+    return { valid: false, statusCode: secretCheck.statusCode, error: secretCheck.error }
   }
   if (!String(params.sku || '').trim()) {
     return { valid: false, statusCode: 400, error: 'SKU is required.' }

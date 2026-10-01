@@ -5,6 +5,7 @@
   "dependencies": {
     "@adobe/aio-commerce-lib-admin-ui": "1.1.0",
     "@adobe/aio-commerce-lib-app": "^2.0.0",
+    "@adobe/aio-commerce-lib-config": "^1.8.0",
     "@adobe/aio-lib-db": "^1.0.4",
     "@adobe/aio-lib-state": "^5.4.0",
     "@adobe/aio-sdk": "^6",

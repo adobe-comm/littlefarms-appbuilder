@@ -2,18 +2,32 @@
   "adminUi": {
     "menu": {
       "aclProtected": true,
-      "description": "Create and manage typed content blocks.",
+      "description": "Manage Little Farms features such as content blocks and brands.",
       "id": "blocks_management",
-      "label": "Blocks Management",
-      "pageTitle": "Blocks Management",
+      "label": "Little Farms Admin",
+      "pageTitle": "Little Farms Admin",
       "parentMenu": "content"
     }
   },
+  "businessConfig": {
+    "schema": [
+      {
+        "default": "",
+        "description": "ACCS GraphQL URL for admin catalog lookups (attributes, categories, products). Example: `https://na1-sandbox.api.commerce.adobe.com/<environment-id>/graphql`",
+        "env": [
+          "saas"
+        ],
+        "label": "Commerce GraphQL endpoint",
+        "name": "COMMERCE_CORE_GRAPHQL_URL",
+        "type": "url"
+      }
+    ]
+  },
   "metadata": {
-    "description": "Blocks Management for LittleFarms content types.",
-    "displayName": "LittleFarms",
+    "description": "Blocks, brands, and other Little Farms admin tools.",
+    "displayName": "Little Farms Admin",
     "id": "littlefarms-blocks",
     "upgradeMode": "manual",
-    "version": "1.0.0"
+    "version": "1.0.1"
   }
 }

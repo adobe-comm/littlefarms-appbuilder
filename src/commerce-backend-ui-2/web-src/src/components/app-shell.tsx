@@ -18,12 +18,13 @@ export function AppShell({ activeModuleId, onModuleChange, children }: AppShellP
 
   return (
     <div className="lf-app-shell">
-      <aside className="lf-module-rail" aria-label="LittleFarms modules">
+      <aside className="lf-module-rail" aria-label="Little Farms Admin features">
         <div className="lf-module-rail-brand">
           <img src={littleFarmsLogo} alt="Little Farms" className="lf-logo" />
           <span className="lf-brand-name">Little Farms</span>
+          <span className="lf-brand-subtitle">Admin</span>
         </div>
-        <p className="lf-module-rail-heading">Extensions</p>
+        <p className="lf-module-rail-heading">Features</p>
         <nav className="lf-module-nav">
           {visibleModules.map(module => (
             <button

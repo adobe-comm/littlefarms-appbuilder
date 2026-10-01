@@ -112,13 +112,13 @@ function App() {
   if (host === "standalone" && !ims) {
     return (
       <main>
-        <h1>Blocks Management</h1>
+        <h1>Little Farms Admin</h1>
         <p>Local development credentials are not configured for this browser tab.</p>
         <p>Set the IMS token and organization ID in session storage, then reload.</p>
       </main>
     );
   }
-  if (error) return <main><h1>Blocks Management</h1><p>{error.message}</p></main>;
+  if (error) return <main><h1>Little Farms Admin</h1><p>{error.message}</p></main>;
   if (!ims) return <main><p>Connecting…</p></main>;
   return (
     <AppShell activeModuleId={activeModuleId} onModuleChange={setActiveModuleId}>

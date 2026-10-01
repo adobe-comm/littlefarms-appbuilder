@@ -30,9 +30,9 @@ flowchart TB
 ### 1. Block type (schema)
 
 - **What**: A template that defines which fields appear in the admin form.
-- **Example (v1)**: `littlefarms_featured_recommended` → **LittleFarms: Featured/Recommended Products**
-  - Number of Products to Display
-  - Conditions (ALL / ANY, nested groups)
+- **Examples**:
+  - `littlefarms_featured_recommended` → **LittleFarms: Featured/Recommended Products** (product count + conditions)
+  - `littlefarms_brands_list` → **LittleFarms: Brands List** (optional view-all URL + repeatable brand rows: image, name, link)
 - **Where in code**: `src/commerce-backend-ui-2/web-src/src/block-types/index.ts` and `actions/block/lib/constants.js` (`BLOCK_TYPES`).
 
 Adding a future type means: register the type in both places and add a form module under `block-types/forms/`.

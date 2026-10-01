@@ -1,0 +1,12 @@
+[
+  {
+    "default": "",
+    "description": "ACCS GraphQL URL for admin catalog lookups (attributes, categories, products). Example: `https://na1-sandbox.api.commerce.adobe.com/<environment-id>/graphql`",
+    "env": [
+      "saas"
+    ],
+    "label": "Commerce GraphQL endpoint",
+    "name": "COMMERCE_CORE_GRAPHQL_URL",
+    "type": "url"
+  }
+]

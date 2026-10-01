@@ -1,0 +1,11 @@
+extensions:
+  # Business configuration (GraphQL URL, etc.). Required for Configure in App Management.
+  - extensionPointId: commerce/configuration/1
+  # App Management lifecycle (associate, install, upgrade).
+  - extensionPointId: commerce/extensibility/1
+  # Admin UI SDK shell (Little Farms Admin → Features).
+  - extensionPointId: commerce/backend-ui/2
+
+apis:
+  - code: AdobeIOManagementAPISDK
+  - code: AppBuilderDataServicesSDK

@@ -39,6 +39,21 @@ runtimeManifest:
             memorySize: 256
           annotations:
             final: true
+        block-storefront:
+          function: ../../actions/block/storefront/blocks/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            LOG_LEVEL: $LOG_LEVEL
+            DB_REGION: $DB_REGION
+            EVALUATE_SHARED_SECRET: $EVALUATE_SHARED_SECRET
+            COMMERCE_CORE_GRAPHQL_URL: $COMMERCE_CORE_GRAPHQL_URL
+            MAGENTO_ENVIRONMENT_ID: $MAGENTO_ENVIRONMENT_ID
+          limits:
+            timeout: 10000
+            memorySize: 256
+          annotations:
+            final: true
         block-list:
           function: ../../actions/block/admin/list/index.js
           web: yes

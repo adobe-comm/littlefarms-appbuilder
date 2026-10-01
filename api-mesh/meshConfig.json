@@ -1,0 +1,16 @@
+{
+  "meshConfig": {
+    "sources": [
+      {
+        "name": "Commerce",
+        "handler": {
+          "graphql": {
+            "endpoint": "{{env.COMMERCE_ENDPOINT}}"
+          }
+        }
+      }
+    ],
+    "additionalTypeDefs": ["./typeDefs.graphql"],
+    "additionalResolvers": ["./resolvers.js"]
+  }
+}

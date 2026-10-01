@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
 import actions from "../config.json";
-import { blockTypes, BLOCK_TYPE_FEATURED_RECOMMENDED, getBlockType } from "../block-types/index.ts";
+import {
+  blockTypes,
+  BLOCK_TYPE_FEATURED_RECOMMENDED,
+  BLOCK_TYPE_BRANDS_LIST,
+  getBlockType,
+} from "../block-types/index.ts";
+import {
+  emptyBrandsListLogic,
+  parseBrandsListLogic,
+  type BrandsListLogic,
+} from "../block-types/brands-list-types.ts";
+import { BrandsListForm } from "../block-types/forms/brands-list-form.tsx";
 import { SectionLayout } from "../components/section-layout.tsx";
 
 type Condition = {
@@ -40,7 +51,7 @@ type SavedCondition = {
   blockType?: string;
   enabled?: boolean;
   sequence?: number;
-  logic: Rule;
+  logic: Rule | BrandsListLogic | Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -479,6 +490,7 @@ function ConditionGroupEditor({
 export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } }) {
   const [view, setView] = useState<AdminView>({ screen: "list" });
   const [rule, setRule] = useState<Rule>(emptyRule());
+  const [brandsLogic, setBrandsLogic] = useState<BrandsListLogic>(emptyBrandsListLogic());
   const [presetId, setPresetId] = useState<string>();
   const [blockTypeId, setBlockTypeId] = useState(BLOCK_TYPE_FEATURED_RECOMMENDED);
   const blockType = getBlockType(blockTypeId);
@@ -531,25 +543,46 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
     setName("");
     setEnabled(true);
     setRule(emptyRule());
+    setBrandsLogic(emptyBrandsListLogic());
     setMatched([]);
     setMessage("");
   }
 
   function openPresetForEdit(preset: SavedCondition) {
+    const typeId = preset.blockType || BLOCK_TYPE_FEATURED_RECOMMENDED;
     setPresetId(preset.id);
-    setBlockTypeId(preset.blockType || BLOCK_TYPE_FEATURED_RECOMMENDED);
+    setBlockTypeId(typeId);
     setName(preset.name);
     setEnabled(preset.enabled !== false);
-    setRule({
-      aggregator: preset.logic.aggregator,
-      matchValue: preset.logic.matchValue !== false,
-      productsToDisplay: displayCount(preset.logic.productsToDisplay),
-      conditions: preset.logic.conditions || [],
-    });
+    if (typeId === BLOCK_TYPE_BRANDS_LIST) {
+      setBrandsLogic(parseBrandsListLogic(preset.logic));
+      setRule(emptyRule());
+    } else {
+      const featuredLogic = preset.logic as Rule;
+      setRule({
+        aggregator: featuredLogic.aggregator,
+        matchValue: featuredLogic.matchValue !== false,
+        productsToDisplay: displayCount(featuredLogic.productsToDisplay),
+        conditions: featuredLogic.conditions || [],
+      });
+      setBrandsLogic(emptyBrandsListLogic());
+    }
     setMatched([]);
     setMessage("");
     setEditSection("block-options");
-    setView({ screen: "edit", blockTypeId: preset.blockType || BLOCK_TYPE_FEATURED_RECOMMENDED, presetId: preset.id });
+    setView({ screen: "edit", blockTypeId: typeId, presetId: preset.id });
+  }
+
+  function buildLogicPayload() {
+    if (blockTypeId === BLOCK_TYPE_BRANDS_LIST) {
+      return brandsLogic;
+    }
+    return {
+      aggregator: rule.aggregator,
+      matchValue: rule.matchValue !== false,
+      productsToDisplay: rule.productsToDisplay,
+      conditions: rule.conditions,
+    };
   }
 
   async function saveBlock(options?: { stayOnForm?: boolean }) {
@@ -561,12 +594,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
           name,
           enabled,
           blockType: blockTypeId,
-          logic: {
-            aggregator: rule.aggregator,
-            matchValue: rule.matchValue !== false,
-            productsToDisplay: rule.productsToDisplay,
-            conditions: rule.conditions,
-          },
+          logic: buildLogicPayload(),
         },
       });
       setPresetId(payload.preset.id);
@@ -705,6 +733,12 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
             className="btn-continue"
             onClick={() => {
               resetEditor();
+              setBlockTypeId(blockTypeId);
+              if (blockTypeId === BLOCK_TYPE_BRANDS_LIST) {
+                setBrandsLogic(emptyBrandsListLogic());
+              } else {
+                setRule(emptyRule());
+              }
               setEditSection("frontend-properties");
               setView({ screen: "edit", blockTypeId });
             }}
@@ -732,16 +766,13 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
           }
         >
           {editSection === "frontend-properties" && (
-            <div className="field-row">
-              <span id="block-type-edit-label">Type</span>
-              <p className="field-readonly" id="block-type-edit" aria-labelledby="block-type-edit-label">
-                {blockType?.label ?? blockTypeId}
-              </p>
-            </div>
-          )}
-
-          {editSection === "block-options" && (
             <>
+              <div className="field-row">
+                <span id="block-type-edit-label">Type</span>
+                <p className="field-readonly" id="block-type-edit" aria-labelledby="block-type-edit-label">
+                  {blockType?.label ?? blockTypeId}
+                </p>
+              </div>
               <div className="field-row">
                 <label htmlFor="block-title">Title<span className="required">*</span></label>
                 <input id="block-title" value={name} onChange={event => setName(event.target.value)} />
@@ -753,6 +784,14 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
                   <option value="0">Disabled</option>
                 </select>
               </div>
+            </>
+          )}
+
+          {editSection === "block-options" && (
+            <>
+              {blockTypeId === BLOCK_TYPE_BRANDS_LIST && (
+                <BrandsListForm logic={brandsLogic} onChange={setBrandsLogic} />
+              )}
 
               {blockTypeId === BLOCK_TYPE_FEATURED_RECOMMENDED && (
                 <>
@@ -811,7 +850,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
   return (
     <main className="conditional-blocks">
       <header className="page-header list-header">
-        <h1>Blocks Management</h1>
+        <h1>Blocks</h1>
         <button
           type="button"
           className="btn-continue"

@@ -1,0 +1,53 @@
+type LittleFarmsBrandItem {
+  image: String
+  name: String!
+  link: String!
+}
+
+type LittleFarmsBrandsListPayload {
+  url: String
+  items: [LittleFarmsBrandItem!]!
+}
+
+type LittleFarmsFeaturedPayload {
+  aggregator: String!
+  matchValue: Boolean!
+  productsToDisplay: Int!
+  conditionsJson: String!
+}
+
+type LittleFarmsBlock {
+  id: ID!
+  name: String!
+  blockType: String!
+  enabled: Boolean!
+  brandsList: LittleFarmsBrandsListPayload
+  featuredRecommended: LittleFarmsFeaturedPayload
+}
+
+type LittleFarmsConditionalBlock {
+  id: ID!
+  name: String!
+  priority: Int!
+  title: String
+  contentHtml: String
+  targetSkus: [String!]!
+}
+
+extend type Query {
+  """
+  Saved block preset by id (Brands List, Featured/Recommended, etc.).
+  """
+  littleFarmsBlock(id: ID!): LittleFarmsBlock
+
+  """
+  Enabled block presets for the app environment. Optional blockType filter
+  (e.g. littlefarms_brands_list, littlefarms_featured_recommended).
+  """
+  littleFarmsBlocks(blockType: String): [LittleFarmsBlock!]!
+
+  """
+  PDP merchandising rules for the current product (legacy conditional_blocks rules).
+  """
+  littleFarmsConditionalBlocks(sku: String!, storeViewCode: String!): [LittleFarmsConditionalBlock!]!
+}

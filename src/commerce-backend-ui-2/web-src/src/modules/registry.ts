@@ -33,8 +33,8 @@ export const littleFarmsLogo = (() => {
 export const appModules: AppModuleDefinition[] = [
   {
     id: "blocks-management",
-    menuLabel: "Blocks Management",
-    pageTitle: "Blocks Management",
+    menuLabel: "Blocks",
+    pageTitle: "Blocks",
     available: true,
   },
   // Example future entries:

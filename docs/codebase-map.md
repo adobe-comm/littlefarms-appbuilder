@@ -6,8 +6,9 @@ All application code lives at the **repository root** (single App Builder projec
 
 | Path | Role |
 |------|------|
-| `app.commerce.config.ts` | App Management + Admin UI SDK registration (menu under **Content**, **Blocks Management**) |
-| `app.config.yaml` | Wires `commerce/extensibility/1` and `commerce/backend-ui/2` extensions |
+| `app.commerce.config.ts` | App Management + Admin UI SDK registration (menu under **Content**, **Little Farms Admin**) |
+| `app.config.yaml` | Wires `commerce/extensibility/1`, `commerce/configuration/1`, and `commerce/backend-ui/2` |
+| `install.yaml` | Commerce install manifest (must list all three extension points for Configure + Admin UI) |
 | `env.dist` | Environment template (Catalog GraphQL, IMS, DB/State regions, evaluate secret) |
 | `actions/block/` | Runtime actions for admin + storefront |
 | `actions/utils.js` | Shared HTTP/error helpers for actions |
@@ -22,10 +23,10 @@ Removed scaffolding: legacy root `web-src/`, `actions/generic/`, and the duplica
 
 ## Admin UI flow
 
-1. Merchant opens **Content → LittleFarms → Blocks Management** (iframe).
+1. Merchant opens **Content → Little Farms Admin** (iframe).
 2. `app.tsx` obtains IMS token via `@adobe/uix-guest` / EXC runtime.
-3. **`AppShell`** — left-hand **Extensions** menu lists LittleFarms modules (bundled logo: `web-src/src/assets/little-farms-logo.png`). Add modules in `appModules`.
-4. **`main-page.tsx`** (Blocks Management) — list / type select / edit with **SectionLayout** (Frontend Properties | Block Options), Page Builder–style.
+3. **`AppShell`** — left-hand **Features** menu lists modules (bundled logo: `web-src/src/assets/little-farms-logo.png`). Add modules in `appModules`.
+4. **`main-page.tsx`** (**Blocks** feature) — list / type select / edit with **SectionLayout** (Frontend Properties | Block Options), Page Builder–style.
 5. SPA calls web actions using URLs from `web-src/src/config.json` (updated by `aio app dev`).
 
 ## Block types (extensibility)

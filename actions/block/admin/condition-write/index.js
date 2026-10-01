@@ -5,10 +5,12 @@ const { transform } = require('./transformer')
 const { preProcess } = require('./pre')
 const { send } = require('./sender')
 const { postProcess } = require('./post')
+const { withCommerceCoreGraphqlUrl } = require('../../lib/enrich-commerce-params')
 
 async function main (params) {
   const logger = Core.Logger('block-condition-write', { level: params.LOG_LEVEL || 'info' })
   try {
+    params = await withCommerceCoreGraphqlUrl(params)
     const validation = validate(params)
     if (!validation.valid) {
       const response = errorResponse(validation.statusCode, validation.error, logger)
