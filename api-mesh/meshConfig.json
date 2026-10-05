@@ -27,12 +27,7 @@
     "additionalResolvers": ["./resolvers.js"],
     "responseConfig": {
       "CORS": {
-        "origin": [
-          "https://www.littlefarms.com",
-          "https://littlefarms.com",
-          "http://localhost:3000",
-          "http://localhost:8080"
-        ],
+        "origin": "*",
         "methods": ["GET", "POST", "OPTIONS"],
         "allowedHeaders": [
           "Content-Type",
