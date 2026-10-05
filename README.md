@@ -2,6 +2,13 @@
 
 Welcome to my Adobe I/O Application!
 
+## Prerequisites
+
+- **Node.js 22** is **preferred** for local development (`npm install`, `aio app dev`, `aio app deploy`, `aio app db`, API Mesh CLI, and related commands). This project has been exercised most often on Node 22.
+- **Node.js 18+** is the minimum (`package.json` `engines`); App Builder actions use the **nodejs:22** runtime in `ext.config.yaml`.
+
+Use `node -v` to confirm your version before running Adobe I/O CLI commands.
+
 ## Setup
 
 - Populate the `.env` file in the project root and fill it as shown [below](#env)
