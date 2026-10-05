@@ -32,7 +32,9 @@
   },
   "scripts": {
     "lint": "eslint --ignore-pattern web-src --no-error-on-unmatched-pattern test src actions",
-    "lint:fix": "npm run lint -- --fix"
+    "lint:fix": "npm run lint -- --fix",
+    "dev": "aio app dev -e commerce/backend-ui/2",
+    "deploy": "aio app deploy"
   },
   "engines": {
     "node": ">=18"
