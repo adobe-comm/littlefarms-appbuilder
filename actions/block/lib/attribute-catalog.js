@@ -1,6 +1,7 @@
 const nodeFetch = require('node-fetch')
 const stateLib = require('@adobe/aio-lib-state')
 const { Core } = require('@adobe/aio-sdk')
+const { createAttributeState, needsAttributeSync } = require('./attribute-state')
 const { MAX_GROUP_DEPTH, DEFAULT_PRODUCTS_TO_DISPLAY, MAX_PRODUCTS_TO_DISPLAY } = require('./constants')
 
 const TOKEN_KEY = 'catalog.ims-token'
@@ -21,6 +22,18 @@ const ATTRIBUTES_QUERY = `
         options { value label }
       }
       errors { message }
+    }
+  }
+`
+
+const ATTRIBUTE_OPTIONS_QUERY = `
+  query BrandAttributeOptions($code: String!) {
+    customAttributeMetadata(attributes: [{ attribute_code: $code, entity_type: "catalog_product" }]) {
+      items {
+        attribute_code
+        input_type
+        attribute_options { value label }
+      }
     }
   }
 `
@@ -414,13 +427,56 @@ function createAttributeCatalog (params, dependencies = {}) {
     return node.aggregator === 'any' ? unionSets(sets) : intersectSets(sets)
   }
 
+  async function fetchAttributeList () {
+    const data = await graphql(ATTRIBUTES_QUERY)
+    const errors = data.attributesList?.errors || []
+    if (errors.length) throw new Error(errors[0].message)
+    return normalizeAttributes(data.attributesList?.items)
+  }
+
+  async function listAttributes () {
+    const cache = await createAttributeState(params, stateFactory)
+    return cache.load(fetchAttributeList)
+  }
+
+  async function attributeOptions (code) {
+    const attributeCode = String(code || '').trim()
+    if (!attributeCode) return null
+    const cache = await createAttributeState(params, stateFactory)
+    const { record, expiration } = await cache.read()
+    if (!record || needsAttributeSync(record, expiration)) {
+      const attributes = await listAttributes()
+      return attributes.find(item => item.code === attributeCode && item.input === 'select') || null
+    }
+    const found = record.attributes.find(item => item.code === attributeCode && item.input === 'select')
+    if (found && (found.options || []).length) {
+      return { code: attributeCode, input: 'select', options: found.options }
+    }
+    try {
+      const data = await graphql(ATTRIBUTE_OPTIONS_QUERY, { code: attributeCode })
+      const item = (data.customAttributeMetadata?.items || [])
+        .find(entry => entry?.attribute_code === attributeCode)
+      const options = (item?.attribute_options || [])
+        .filter(option => option?.value !== undefined && option?.value !== null && String(option.value).trim() !== '')
+        .map(option => ({
+          value: String(option.value).trim(),
+          label: String(option.label || option.value).trim() || String(option.value).trim()
+        }))
+      const input = String(item?.input_type || 'select').toLowerCase()
+      if (item && options.length && input === 'select') {
+        return { code: attributeCode, input: 'select', options }
+      }
+    } catch {
+      // This query is not on every Commerce schema. The full list is the fallback.
+    }
+    const attributes = await listAttributes()
+    return attributes.find(item => item.code === attributeCode && item.input === 'select') || null
+  }
+
   return {
-    async listAttributes () {
-      const data = await graphql(ATTRIBUTES_QUERY)
-      const errors = data.attributesList?.errors || []
-      if (errors.length) throw new Error(errors[0].message)
-      return normalizeAttributes(data.attributesList?.items)
-    },
+    listAttributes,
+    attributeOptions,
+    syncAttributes: () => createAttributeState(params, stateFactory).then(cache => cache.sync(fetchAttributeList)),
     async listCategories () {
       if (!params.COMMERCE_CORE_GRAPHQL_URL) {
         const error = new Error('COMMERCE_CORE_GRAPHQL_URL is not configured.')

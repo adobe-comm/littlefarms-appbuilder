@@ -43,4 +43,49 @@ extend type Query {
     sku: String
     storeViewCode: String
   ): [LittleFarmsBlock!]!
+  littleFarmsBrand(id: ID, name: String, urlAlias: String, storeViewCode: String): LittleFarmsBrand
+  littleFarmsBrands(
+    storeViewCode: String
+    widget: LittleFarmsBrandWidget
+    page: Int
+    pageSize: Int
+  ): [LittleFarmsBrand!]!
+  littleFarmsBrandsList(storeViewCode: String): [LittleFarmsBrandSummary!]!
+}
+
+type LittleFarmsBrandSummary {
+  id: ID!
+  name: String!
+  slug: String!
+  image: String
+}
+
+enum LittleFarmsBrandWidget {
+  LIST
+  SLIDER
+}
+
+type LittleFarmsBrand {
+  id: ID!
+  name: String!
+  attributeCode: String!
+  urlAlias: String
+  isActive: Boolean!
+  isNewBrand: Boolean!
+  isTopBrand: Boolean!
+  isFeatured: Boolean!
+  showInBrandListWidget: Boolean!
+  showInBrandSliderWidget: Boolean!
+  sliderPosition: Int!
+  metaTitle: String
+  metaDescription: String
+  metaKeywords: String
+  pageTitle: String
+  description: String
+  shortDescription: String
+  image: String
+  imageAlt: String
+  smallImage: String
+  smallImageAlt: String
+  storeViewCode: String!
 }

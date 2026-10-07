@@ -5,7 +5,10 @@ import Runtime, { init } from "@adobe/exc-app";
 
 import config from "../../../commerce-extensibility-1/.generated/app.commerce.config.js";
 import { AppShell, defaultAppModuleId } from "./components/app-shell.tsx";
+import { CommerceLoader } from "./components/commerce-loader.tsx";
+import { BrandsPage } from "./pages/brands-page.tsx";
 import { MainPage } from "./pages/main-page.tsx";
+import { SettingsPage } from "./pages/settings-page.tsx";
 
 type Ims = {
   imsToken: string;
@@ -119,11 +122,13 @@ function App() {
     );
   }
   if (error) return <main><h1>Little Farms Admin</h1><p>{error.message}</p></main>;
-  if (!ims) return <main><p>Connecting…</p></main>;
+  if (!ims) return <CommerceLoader cover="screen" />;
   return (
     <AppShell activeModuleId={activeModuleId} onModuleChange={setActiveModuleId}>
       {activeModuleId === "blocks-management" && <MainPage ims={ims} />}
-      {activeModuleId !== "blocks-management" && (
+      {activeModuleId === "brands-management" && <BrandsPage ims={ims} />}
+      {activeModuleId === "settings" && <SettingsPage ims={ims} />}
+      {activeModuleId !== "blocks-management" && activeModuleId !== "brands-management" && activeModuleId !== "settings" && (
         <main className="conditional-blocks">
           <p>This module is not available yet.</p>
         </main>

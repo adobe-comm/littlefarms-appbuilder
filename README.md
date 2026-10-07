@@ -32,6 +32,31 @@ For more information on the difference between `aio app run` and `aio app dev`, 
 - `aio app deploy` to build and deploy all actions on Runtime and static files to CDN
 - `aio app undeploy` to undeploy the app
 
+## Brand database indexes
+
+Brand reads do not create indexes. `littlefarms_brands` on `748062-littlefarms-stage` already has these three. After the app moves to a new Runtime namespace, create them once before using the brand list. Set `--region` to the same value as `DB_REGION` when that namespace is not in `amer`.
+
+```bash
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"optionValue":1}' \
+  --name brand_option_scope \
+  --unique
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"optionLabel":1}' \
+  --name brand_label
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"optionLabel":1}' \
+  --name brand_list
+```
+
+`brand_option_scope` keeps one row per option in a store view. `brand_list` is the index the brand directory query uses. Confirm with:
+
+```bash
+aio app db index list littlefarms_brands --json
+```
+
 ## Config
 
 ### `.env`

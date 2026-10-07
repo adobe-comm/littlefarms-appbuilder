@@ -435,3 +435,259 @@ Numeric operators coerce both sides to numbers. If either side is not a number, 
 |---------|------|--------|-------------|
 | 1.0 | 2026-09-28 | Solutions Architect Agent | Initial architecture for the SaaS conditional block: admin SPA, database rules, catalog evaluation, State cache, storefront contract. |
 | 1.0 | 2026-09-28 | Solutions Architect Agent | Approved for implementation by the user. |
+| 1.1 | 2026-10-05 | Solutions Architect Agent | Brands module architecture draft. Blocks section above is unchanged. |
+| 1.2 | 2026-10-05 | Solutions Architect Agent | Brands module architecture approved. |
+
+---
+
+## Brands module
+
+<!--
+  Phase 2 for the Brands module. Blocks architecture above stays as approved v1.0.
+  Requirements: REQUIREMENTS.md v1.7, Brands module.
+-->
+
+### Document control
+
+| Field | Value |
+|-------|-------|
+| **Version** | 0.2 |
+| **Status** | approved |
+| **Last Updated** | 2026-10-05 |
+| **Architect** | Solutions Architect Agent |
+| **Requirements Source** | REQUIREMENTS.md v1.7, Brands module |
+| **Approval** | 2026-10-05 |
+
+### Environment
+
+| Aspect | Value |
+|--------|-------|
+| **Platform** | SaaS (ACCS) |
+| **Application Type** | Admin UI SDK V2 SPA plus API Mesh |
+| **Runtime** | Node.js 22 |
+| **App** | Existing `littlefarms-appbuilder`. No second App Builder app |
+
+IMS is mandatory. Admin actions that read or write the database set `include-ims-credentials: true`, same as Blocks.
+
+### Webhook Validation Table
+
+This module does not register a Commerce checkout webhook. Admin UI SDK V2 opens the existing app in an iframe. The storefront reads brands through API Mesh. There is no `before` or `after` webhook method to subscribe.
+
+The checkout webhook schema (`references/webhook-validation.schema.json`) only allows payment, shipping, taxes, and events. Those domains do not apply here.
+
+| Target domain | Action file | Webhook method name | Webhook type | Response format | Required | Logging | Documentation source |
+|---------------|-------------|---------------------|--------------|-----------------|----------|---------|----------------------|
+| Admin UI (not a checkout webhook) | None | Not applicable. No Commerce webhook method | Not applicable. Not `before` or `after` | Admin JSON for merchants. GraphQL for the storefront | Not applicable. No Commerce Admin webhook Required flag | `LOG_LEVEL` on the action. `x-ow-extra-logging` is a Commerce webhook header and is not used | [Admin UI SDK V2 menu](https://developer.adobe.com/commerce/extensibility/admin-ui-sdk/extension-points/v2/menu): one menu item per app; it opens the App Builder UI. [Programmatic mesh resolvers](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/extend/resolvers/programmatic-resolvers): storefront queries |
+
+#### Webhook configuration summary
+
+- **Webhook method name:** none. [Menu docs](https://developer.adobe.com/commerce/extensibility/admin-ui-sdk/extension-points/v2/menu) describe an Admin iframe, not a webhook subscription.
+- **Webhook type:** none.
+- **Commerce Admin Required field:** not used. An empty brand lookup returns `null` (one brand) or `[]` (a list). The storefront renders no brand block. Checkout is unaffected.
+- **Dual security for this module:**
+  1. **Admin OAuth.** `require-adobe-auth: true` on `brand-settings`, `brand-list`, `brand-write`, and `brand-asset`. The Commerce Admin IMS session is who may call them. This matches the existing `block-list` annotation in `src/commerce-backend-ui-2/ext.config.yaml`.
+  2. **Signature verification** (`COMMERCE_WEBHOOKS_PUBLIC_KEY`) does not apply. Commerce does not POST a signed webhook body to these actions.
+  3. **Storefront.** API Mesh calls `brand-storefront`. The mesh holds the action URL in `api-mesh/secrets.yaml`. Shopper browsers do not receive admin IMS credentials. Brand content is public catalog data, same class as the public Blocks preset read. Inactive and hidden brands are omitted.
+
+### Where it sits in the app
+
+[V2 menu](https://developer.adobe.com/commerce/extensibility/admin-ui-sdk/extension-points/v2/menu) allows one `adminUi.menu` per app. Little Farms Admin already owns **Apps → Little Farms Admin**. Brands is a module on the existing rail in `src/commerce-backend-ui-2/web-src/src/modules/registry.ts`:
+
+| Field | Value |
+|-------|-------|
+| id | `brands-management` |
+| menuLabel | Brands |
+| available | `true` when the module ships |
+
+No new `parentMenu`. No second Commerce app.
+
+### Component architecture
+
+Single-file actions (`index.js`), plus `actions/brand/lib/`. This matches `actions/block/storefront/blocks/index.js`. Shared database, slug, and cache helpers stay in the lib. Do not add a validator/transformer/sender pipeline.
+
+| Action | Path | Who calls it | Purpose |
+|--------|------|--------------|---------|
+| `brand-settings` | `actions/brand/admin/settings/index.js` | Admin SPA | List dropdown attributes. Read and save the selected code |
+| `brand-list` | `actions/brand/admin/list/index.js` | Admin SPA | Sync options, return a page of brands for the grid |
+| `brand-write` | `actions/brand/admin/write/index.js` | Admin SPA | Save one brand for a store-view scope |
+| `brand-asset` | `actions/brand/admin/asset/index.js` | Admin SPA | Upload image or small image, return the public URL |
+| `brand-storefront` | `actions/brand/storefront/brand/index.js` | API Mesh | Read one brand, a list widget, or a slider widget |
+
+Runtime for each: `web: yes`, `runtime: nodejs:22`, `final: true`, `include-ims-credentials: true`.
+
+| Action | Auth annotation | Timeout | Memory |
+|--------|-----------------|---------|--------|
+| `brand-settings` | `require-adobe-auth: true` | 15000 ms | 256 MB |
+| `brand-list` | `require-adobe-auth: true` | 20000 ms | 512 MB |
+| `brand-write` | `require-adobe-auth: true` | 10000 ms | 256 MB |
+| `brand-asset` | `require-adobe-auth: true` | 20000 ms | 512 MB |
+| `brand-storefront` | No `require-adobe-auth` (mesh server call, public brand read) | 15000 ms | 512 MB |
+
+`brand-list` and `brand-settings` also receive the Commerce GraphQL inputs already used by `block-metadata` (`COMMERCE_CORE_GRAPHQL_URL`, IMS client inputs, `MAGENTO_ENVIRONMENT_ID`, store headers).
+
+### Attribute selection
+
+`brand-settings` calls Commerce GraphQL [`attributesList`](https://developer.adobe.com/commerce/webapi/graphql/schema/attributes/queries/attributes-list) with `entityType: CATALOG_PRODUCT`. The same query already exists in `actions/block/lib/attribute-catalog.js`. The response keeps items whose `frontend_input` is select (`select` or `SELECT`).
+
+Settings document, collection **`littlefarms_brand_settings`**, id `settings`:
+
+| Field | Rule |
+|-------|------|
+| `brandAttributeCode` | Empty string until a merchant saves a choice. No preset code |
+| `updatedAt` | ISO time |
+
+Save of a **different** code requires `confirmAttributeChange: true`. Without it the action returns 409 and writes nothing. With it:
+
+1. Persist the new code.
+2. Set `hidden: true` on brand documents whose `attributeCode` is not the new code.
+3. Set `hidden: false` on documents for the new code, except options Commerce has removed.
+4. Delete State keys for brand reads (see cache).
+
+The grid and storefront only show documents for the active code with `hidden: false` and `optionRemoved: false`.
+
+### Brand documents
+
+Collection **`littlefarms_brands`**. Same workspace database as Blocks ([Database Storage](https://developer.adobe.com/app-builder/docs/guides/app_builder_guides/storage/database)). Create the collection on first use, following `actions/block/lib/preset-store.js`.
+
+Document id: `{attributeCode}:{optionValue}:{storeViewCode}`.
+
+| Scope value | Meaning |
+|-------------|---------|
+| `all` | All Store Views. Holds the full field set. This is the edit scope that opens by default |
+| A store view code, such as `default` | Overrides for that view only. Fields with Use Default Value are absent |
+
+Read path for store view `default`: load `all`, then overlay the `default` document. Grid Store View column shows the website, store, and store view for the scope the merchant picked. The reference screen shows Main Website / Main Website Store / Default Store View while the editor scope starts at All Store Views.
+
+On each `brand-list` call, and after an attribute save, sync options for the active code:
+
+- New option → insert an `all` document. `optionLabel` is the Commerce label. `optionValue` is the Commerce value. `is_active: true`. Other booleans and `slider_position` use the requirement defaults. `url_alias` is the slug of the label. If that slug is already used for another option in that scope, append `-2`, `-3`, and so on.
+- Label changed in Commerce → update `optionLabel` on the `all` document. Do not rewrite `url_alias` after the merchant has saved.
+- Option gone from Commerce → `optionRemoved: true`, `hidden: true`. Do not delete the document. If the option returns, clear both flags.
+
+`brand-list` pages the grid. Default page size 50, matching the reference screen. The reference data set is about 1,220 brands, so the action must not return every document in one response.
+
+`brand-write` updates one scope. It rejects a `url_alias` that resolves to another brand in that store view. It does not change `optionValue` or `attributeCode`.
+
+### Images
+
+[aio-lib-files](https://github.com/adobe/aio-lib-files): `brand-asset` writes `public/brands/{attributeCode}/{optionValue}/image-{stamp}` or `small-{stamp}`, then `getProperties` and returns `url`. `brand-write` stores that URL on `image` or `small_image`. Replacing a file writes a new object. The old public object can remain. Do not put binary image data in the database.
+
+### Storefront contract
+
+Extend `api-mesh/schema.graphql` and `api-mesh/resolvers.js` with programmatic resolvers ([resolver docs](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/extend/resolvers/programmatic-resolvers)). Mesh `secrets.yaml` gains the `brand-storefront` URL. Deploy stays `aio api-mesh update`.
+
+```graphql
+enum LittleFarmsBrandWidget { LIST SLIDER }
+
+type LittleFarmsBrand {
+  id: ID!
+  name: String!
+  attributeCode: String!
+  urlAlias: String
+  isActive: Boolean!
+  isNewBrand: Boolean!
+  isTopBrand: Boolean!
+  isFeatured: Boolean!
+  showInBrandListWidget: Boolean!
+  showInBrandSliderWidget: Boolean!
+  sliderPosition: Int!
+  metaTitle: String
+  metaDescription: String
+  metaKeywords: String
+  pageTitle: String
+  description: String
+  shortDescription: String
+  image: String
+  imageAlt: String
+  smallImage: String
+  smallImageAlt: String
+  storeViewCode: String!
+}
+
+extend type Query {
+  littleFarmsBrand(id: ID, name: String, urlAlias: String, storeViewCode: String): LittleFarmsBrand
+  littleFarmsBrands(storeViewCode: String, widget: LittleFarmsBrandWidget, page: Int, pageSize: Int): [LittleFarmsBrand!]!
+}
+```
+
+| Query | Rule |
+|-------|------|
+| `littleFarmsBrand` | Exactly one of `id` (option value), `name` (option label), `urlAlias`. `storeViewCode` defaults to `default` |
+| `littleFarmsBrands` | `LIST` keeps `showInBrandListWidget`. `SLIDER` keeps `showInBrandSliderWidget` and sorts by `sliderPosition`, then name. Omitted widget returns active brands. `pageSize` max 50 |
+| Both | Drop `is_active: false`, `hidden: true`, and `optionRemoved: true` |
+
+Product grids stay on Commerce [`productSearch`](https://developer.adobe.com/commerce/webapi/graphql/schema/live-search/queries/product-search), filtered by the active attribute and this brand’s option value. The attribute must be filterable in search. This app does not return product cards. `brand-settings` may surface a warning when metadata shows the attribute is not filterable. It still saves the merchant’s choice.
+
+Widget flags are only on this GraphQL type. They do not update the Blocks Brands List editor.
+
+### Cache
+
+[Application State](https://developer.adobe.com/app-builder/docs/guides/app_builder_guides/storage/application-state): TTL **600 seconds** (same order as `PRESET_RESULT_CACHE_TTL`). Max value size is 1MB, so State does not hold a full page of HTML descriptions for every brand.
+
+| Key | Value |
+|-----|--------|
+| `brand.{storeView}.id.{optionValue}` | One resolved brand |
+| `brand.{storeView}.name.{normalizedLabel}` | One resolved brand |
+| `brand.{storeView}.alias.{urlAlias}` | One resolved brand |
+| `brand.{storeView}.widget.{list\|slider}.page.{n}` | Slim cards: id, name, urlAlias, smallImage, smallImageAlt, sliderPosition, flags |
+
+`brand-write`, `brand-asset` (when it updates a URL), and attribute change delete the keys for that brand and the widget pages. Region comes from `$STATE_REGION`, same as Blocks.
+
+### Configuration impact
+
+| File | Change |
+|------|--------|
+| `src/commerce-backend-ui-2/ext.config.yaml` | Five actions, inputs, annotations, limits |
+| `src/commerce-backend-ui-2/web-src/src/modules/registry.ts` | Brands module |
+| `api-mesh/schema.graphql`, `resolvers.js`, `secrets.yaml` | Brand queries |
+| `env.dist` | No new secrets if Commerce GraphQL and DB/State inputs are already present. Mesh secret for the storefront action URL |
+
+No `payment-methods.yaml`, `shipping-carriers.yaml`, or `tax-integrations.yaml`. No checkout onboarding script.
+
+### Data flow
+
+```mermaid
+sequenceDiagram
+    participant Admin as Commerce Admin SPA
+    participant Settings as brand-settings
+    participant List as brand-list
+    participant Catalog as Commerce GraphQL
+    participant DB as App Builder Database
+    participant Mesh as API Mesh
+    participant Store as brand-storefront
+    participant State as App Builder State
+
+    Admin->>Settings: Save dropdown code with confirm
+    Settings->>DB: brandAttributeCode, hide other attributes
+    Admin->>List: Open Brand Management
+    List->>Catalog: attributesList options
+    List->>DB: Upsert option rows, return page
+    Mesh->>Store: littleFarmsBrand or littleFarmsBrands
+    Store->>State: Read cache
+    Store->>DB: On miss, resolve store view over All Store Views
+    Store->>State: Put 600s
+```
+
+### Decisions
+
+| ID | Decision | Rationale |
+|----|----------|-----------|
+| AD-B1 | No checkout webhook | Requirements are Admin management and a storefront read. Menu and mesh docs describe those entry points |
+| AD-B2 | Module rail, not a second Admin menu | V2 allows one menu item per app. The shell already exists |
+| AD-B3 | Single-file actions | Matches `block-storefront`. This module has no webhook pipeline |
+| AD-B4 | Database for brands, State for reads, Files for images | Brand queries and store-view overrides need documents. Cache expires. Images are binaries with a public URL |
+| AD-B5 | Hide on attribute change | Confirmed requirement. Documents stay so the previous attribute can be selected again |
+| AD-B6 | No default attribute code | `if_brand` was an example. Settings stay empty until a merchant chooses |
+| AD-B7 | Paginate admin and widget reads | Reference grid is about 1,220 brands. State values are capped at 1MB |
+| AD-B8 | Products stay on `productSearch` | Confirmed. This app returns brand content and the option id the storefront filters with |
+
+### Testing
+
+Recommendations only, per requirements. Manual checks: select an attribute, confirm a switch hides and restores rows, edit All Store Views and a store-view override, unique alias postfix, upload, GraphQL by id, name, and alias, list and slider filters. No generated suite unless requested later.
+
+### Approvals
+
+| Role | Name | Date |
+|------|------|------|
+| Architect | Solutions Architect Agent | 2026-10-05 |
+| Technical Lead | User approval | 2026-10-05 |

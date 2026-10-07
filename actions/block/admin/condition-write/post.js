@@ -5,6 +5,7 @@ async function postProcess (result, _prepared, params) {
   if (result?.preset && params) {
     const cache = await createPresetResultCache(params)
     await cache.invalidate(presetCacheKey(result.preset))
+    await cache.invalidateLists()
   }
   return result
 }

@@ -17,6 +17,7 @@
             "operationHeaders": {
               "x-lf-storefront-url": "{context.secrets.LITTLEFARMS_BLOCK_STOREFRONT_URL}",
               "x-lf-evaluate-url": "{context.secrets.LITTLEFARMS_BLOCK_EVALUATE_URL}",
+              "x-lf-brand-url": "{context.secrets.LITTLEFARMS_BRAND_STOREFRONT_URL}",
               "x-lf-shared-secret": "{context.secrets.EVALUATE_SHARED_SECRET}"
             }
           }

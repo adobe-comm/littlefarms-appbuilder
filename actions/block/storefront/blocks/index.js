@@ -88,17 +88,27 @@ async function main (params) {
       return { statusCode: 200, body: { block } }
     }
 
+    const blockType = String(params.blockType || '').trim()
+    const listCache = await createPresetResultCache(params)
+    const cached = await listCache.getList(scope.environmentId, blockType)
+    if (cached) {
+      logger.info(`Block list served from State for ${blockType || 'all types'}`)
+      return { statusCode: 200, body: cached }
+    }
+
     let presets = await store.list(scope)
     presets = presets.filter(preset => preset.enabled !== false)
-    const blockType = String(params.blockType || '').trim()
     if (blockType) {
       presets = presets.filter(preset => (preset.blockType || DEFAULT_BLOCK_TYPE) === blockType)
     }
 
     const blocks = await enrichPresetsForStorefront(presets, params, logger)
+    const body = { blocks }
+    await listCache.putList(scope.environmentId, blockType, body)
+    logger.info(`Stored ${blocks.length} blocks in State for ${blockType || 'all types'}`)
     return {
       statusCode: 200,
-      body: { blocks }
+      body
     }
   } catch (error) {
     logger.error(error)

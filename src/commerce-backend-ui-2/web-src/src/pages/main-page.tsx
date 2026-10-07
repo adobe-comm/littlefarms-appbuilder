@@ -12,6 +12,7 @@ import {
   type BrandsListLogic,
 } from "../block-types/brands-list-types.ts";
 import { BrandsListForm } from "../block-types/forms/brands-list-form.tsx";
+import { CommerceLoader } from "../components/commerce-loader.tsx";
 import { SectionLayout } from "../components/section-layout.tsx";
 
 type Condition = {
@@ -246,6 +247,7 @@ function ProductChooser({
   return (
     <div className="chooser-backdrop" role="dialog" aria-label="Choose products">
       <div className="chooser">
+        {loading ? <CommerceLoader cover="local" /> : null}
         <header>
           <strong>{page.total} records found</strong>
           <div className="chooser-actions">
@@ -254,7 +256,7 @@ function ProductChooser({
             <button type="button" onClick={() => setOpen(false)}>Close</button>
           </div>
         </header>
-        <p>{loading ? "Loading…" : `${page.pageSize} per page · page ${page.page} of ${lastPage}`}</p>
+        <p>{`${page.pageSize} per page · page ${page.page} of ${lastPage}`}</p>
         {error && <p className="message" role="status">{error}</p>}
         <table>
           <thead>
@@ -765,6 +767,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
   if (view.screen === "edit") {
     return (
       <main className="conditional-blocks">
+        {(saving || fetching) ? <CommerceLoader /> : null}
         {message && <p className="message" role="status">{message}</p>}
         <SectionLayout
           heading={presetId ? "Edit Block" : "New Block"}
@@ -861,6 +864,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
 
   return (
     <main className="conditional-blocks">
+      {(loadingPresets || flushingCache) ? <CommerceLoader /> : null}
       <header className="page-header list-header">
         <h1>Blocks</h1>
         <div className="list-header-actions">
@@ -918,9 +922,6 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
             </tr>
           </thead>
           <tbody>
-            {loadingPresets && (
-              <tr><td colSpan={5}>Loading…</td></tr>
-            )}
             {!loadingPresets && pagePresets.length === 0 && (
               <tr><td colSpan={5}>No blocks found.</td></tr>
             )}

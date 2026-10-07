@@ -61,6 +61,34 @@ function secretsFrom (context) {
   return (context && context.secrets) || {}
 }
 
+function mapBrand (entry) {
+  if (!entry || entry.id == null || entry.id === '') return null
+  return {
+    id: String(entry.id),
+    name: entry.name || '',
+    attributeCode: entry.attributeCode || '',
+    urlAlias: entry.urlAlias || '',
+    isActive: entry.isActive !== false,
+    isNewBrand: entry.isNewBrand === true,
+    isTopBrand: entry.isTopBrand === true,
+    isFeatured: entry.isFeatured === true,
+    showInBrandListWidget: entry.showInBrandListWidget !== false,
+    showInBrandSliderWidget: entry.showInBrandSliderWidget === true,
+    sliderPosition: Number(entry.sliderPosition) || 0,
+    metaTitle: entry.metaTitle || '',
+    metaDescription: entry.metaDescription || '',
+    metaKeywords: entry.metaKeywords || '',
+    pageTitle: entry.pageTitle || '',
+    description: entry.description || '',
+    shortDescription: entry.shortDescription || '',
+    image: entry.image || '',
+    imageAlt: entry.imageAlt || '',
+    smallImage: entry.smallImage || '',
+    smallImageAlt: entry.smallImageAlt || '',
+    storeViewCode: entry.storeViewCode || 'default'
+  }
+}
+
 module.exports = {
   resolvers: {
     Query: {
@@ -133,6 +161,73 @@ module.exports = {
               }
               return block
             })
+          })
+        }
+      },
+      littleFarmsBrand: {
+        resolve: function (_root, args, context) {
+          var secrets = secretsFrom(context)
+          var id = String(args.id || '').trim()
+          var name = String(args.name || '').trim()
+          var urlAlias = String(args.urlAlias || '').trim()
+          var lookups = [id, name, urlAlias].filter(Boolean)
+          if (lookups.length !== 1) {
+            return Promise.reject(new Error('littleFarmsBrand requires exactly one of id, name, or urlAlias.'))
+          }
+          var body = { operation: 'get' }
+          if (id) body.id = id
+          else if (name) body.name = name
+          else body.urlAlias = urlAlias
+          if (args.storeViewCode) body.storeViewCode = String(args.storeViewCode).trim()
+          return postJson(
+            secrets.LITTLEFARMS_BRAND_STOREFRONT_URL,
+            '',
+            body,
+            { skipSecret: true }
+          ).then(function (payload) {
+            return mapBrand(payload.brand)
+          })
+        }
+      },
+      littleFarmsBrandsList: {
+        resolve: function (_root, args, context) {
+          var secrets = secretsFrom(context)
+          var body = { operation: 'directory' }
+          if (args.storeViewCode) body.storeViewCode = String(args.storeViewCode).trim()
+          return postJson(
+            secrets.LITTLEFARMS_BRAND_STOREFRONT_URL,
+            '',
+            body,
+            { skipSecret: true }
+          ).then(function (payload) {
+            return (payload.items || []).filter(function (item) {
+              return item && item.id
+            }).map(function (item) {
+              return {
+                id: String(item.id),
+                name: item.name || '',
+                slug: item.slug || '',
+                image: item.image || ''
+              }
+            })
+          })
+        }
+      },
+      littleFarmsBrands: {
+        resolve: function (_root, args, context) {
+          var secrets = secretsFrom(context)
+          var body = { operation: 'list' }
+          if (args.storeViewCode) body.storeViewCode = String(args.storeViewCode).trim()
+          if (args.widget) body.widget = String(args.widget).trim()
+          if (args.page != null) body.page = args.page
+          if (args.pageSize != null) body.pageSize = args.pageSize
+          return postJson(
+            secrets.LITTLEFARMS_BRAND_STOREFRONT_URL,
+            '',
+            body,
+            { skipSecret: true }
+          ).then(function (payload) {
+            return (payload.items || []).map(mapBrand).filter(Boolean)
           })
         }
       }

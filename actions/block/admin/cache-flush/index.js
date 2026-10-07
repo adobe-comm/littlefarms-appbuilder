@@ -13,6 +13,7 @@ async function main (params) {
 
     if (blockId) {
       await presetCache.invalidate(blockId)
+      await presetCache.invalidateLists()
       logger.info(`Flushed preset result cache for block ${blockId}`)
       return { statusCode: 200, body: { flushed: true, scope: 'block', id: blockId } }
     }

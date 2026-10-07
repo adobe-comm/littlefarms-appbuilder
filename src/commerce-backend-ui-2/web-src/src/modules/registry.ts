@@ -37,8 +37,18 @@ export const appModules: AppModuleDefinition[] = [
     pageTitle: "Blocks",
     available: true,
   },
-  // Example future entries:
-  // { id: "picker-management", menuLabel: "Picker Management", pageTitle: "Picker Management", available: false },
+  {
+    id: "brands-management",
+    menuLabel: "Brands",
+    pageTitle: "Brands",
+    available: true,
+  },
+  {
+    id: "settings",
+    menuLabel: "Settings",
+    pageTitle: "Settings",
+    available: true,
+  },
 ];
 
 export function getAppModule(id: string): AppModuleDefinition | undefined {

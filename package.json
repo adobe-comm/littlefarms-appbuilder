@@ -7,14 +7,17 @@
     "@adobe/aio-commerce-lib-app": "^2.0.0",
     "@adobe/aio-commerce-lib-config": "^1.8.0",
     "@adobe/aio-lib-db": "^1.0.4",
+    "@adobe/aio-lib-files": "^4.1.4",
     "@adobe/aio-lib-state": "^5.4.0",
     "@adobe/aio-sdk": "^6",
     "@adobe/exc-app": "^1.6.6",
     "@adobe/uix-guest": "^1.0.3",
     "@babel/core": "^7.8.7",
     "@babel/preset-env": "^7.29.0",
+    "@hugerte/hugerte-react": "^2.0.2",
     "@react-spectrum/s2": "1.5.1",
     "babel-loader": "^10.0.0",
+    "hugerte": "^1.0.14",
     "node-fetch": "^2.6.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
@@ -35,7 +38,8 @@
     "lint:fix": "npm run lint -- --fix",
     "dev": "aio app dev -e commerce/backend-ui/2",
     "deploy": "aio app deploy",
-    "collection-list": "aio app db collection list"
+    "collection-list": "aio app db collection list",
+    "update-mesh": "cd api-mesh && aio api-mesh update meshConfig.json -s secrets.yaml"
   },
   "engines": {
     "node": ">=18"

@@ -23,6 +23,8 @@ Browser clients should use this mesh endpoint (with CORS); do not call App Build
 | `littleFarmsBlock(blockId:)` / `id` / `title` | One preset by Admin **Block ID**, UUID, or title |
 | `littleFarmsBlocks(blockType)` | Enabled presets; optional type filter. Featured blocks include **`productSkus`** (Commerce evaluation, cached 10 min in State) |
 | `littleFarmsBlocks(sku, storeViewCode)` | PDP placement blocks (`blockType`: `littlefarms_placement`) |
+| `littleFarmsBrandsList(storeViewCode)` | Every visible brand as `id`, `name`, `slug`, and `image`. The action stores that directory in State until a brand save flushes it |
+| `littleFarmsBrand` / `littleFarmsBrands` | One brand, or one page of full brand records |
 
 See [`schema.graphql`](./schema.graphql) and [`meshConfig.json`](./meshConfig.json) (JsonSchema stub source + programmatic resolvers; no Commerce).
 
