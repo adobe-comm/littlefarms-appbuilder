@@ -302,7 +302,18 @@ runtimeManifest:
           inputs:
             minutes: 43200
             trigger_payload: '{"scheduled":true}'
+        storefront-warm:
+          feed: /whisk.system/alarms/interval
+          inputs:
+            minutes: 4
+            trigger_payload: '{"warm":true}'
       rules:
         attribute-sync-monthly-rule:
           trigger: attribute-sync-monthly
           action: attribute-sync
+        storefront-warm-blocks:
+          trigger: storefront-warm
+          action: block-storefront
+        storefront-warm-brands:
+          trigger: storefront-warm
+          action: brand-storefront

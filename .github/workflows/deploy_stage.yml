@@ -41,21 +41,21 @@ jobs:
           SCOPES: ${{ secrets.SCOPES }}
       - name: Build
         env:
-          AIO_RUNTIME_NAMESPACE: ${{ secrets.AIO_RUNTIME_NAMESPACE }}
+          AIO_RUNTIME_NAMESPACE: ${{ secrets.STAGE_AIO_RUNTIME_NAMESPACE }}
         uses: adobe/aio-apps-action@4.1.0
         with:
           os: ${{ matrix.os }}
           command: build
       - name: Deploy
         env:
-          AIO_RUNTIME_NAMESPACE: ${{ secrets.AIO_RUNTIME_NAMESPACE }}
-          AIO_RUNTIME_AUTH: ${{ secrets.AIO_RUNTIME_AUTH }}
+          AIO_RUNTIME_NAMESPACE: ${{ secrets.STAGE_AIO_RUNTIME_NAMESPACE }}
+          AIO_RUNTIME_AUTH: ${{ secrets.STAGE_AIO_RUNTIME_AUTH }}
           AIO_PROJECT_ID: ${{ secrets.AIO_PROJECT_ID }}
           AIO_PROJECT_NAME: ${{ secrets.AIO_PROJECT_NAME }}
           AIO_PROJECT_ORG_ID: ${{ secrets.AIO_PROJECT_ORG_ID }}
-          AIO_PROJECT_WORKSPACE_ID: ${{ secrets.AIO_PROJECT_WORKSPACE_ID }}
-          AIO_PROJECT_WORKSPACE_NAME: ${{ secrets.AIO_PROJECT_WORKSPACE_NAME }}
-          AIO_PROJECT_WORKSPACE_DETAILS_SERVICES: ${{ secrets.AIO_PROJECT_WORKSPACE_DETAILS_SERVICES }}
+          AIO_PROJECT_WORKSPACE_ID: ${{ secrets.STAGE_AIO_PROJECT_WORKSPACE_ID }}
+          AIO_PROJECT_WORKSPACE_NAME: ${{ secrets.STAGE_AIO_PROJECT_WORKSPACE_NAME }}
+          AIO_PROJECT_WORKSPACE_DETAILS_SERVICES: ${{ secrets.STAGE_AIO_PROJECT_WORKSPACE_DETAILS_SERVICES }}
         uses: adobe/aio-apps-action@4.1.0
         with:
           os: ${{ matrix.os }}

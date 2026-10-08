@@ -7,6 +7,19 @@ const { toPublicBlock } = require('../../lib/public-preset')
 const { createPresetResultCache } = require('../../lib/preset-result-cache')
 const { createAttributeCatalog } = require('../../lib/attribute-catalog')
 
+function isWarmPing (params) {
+  if (params.warm === true || params.warm === 'true') return true
+  const payload = params.trigger_payload
+  if (!payload) return false
+  if (typeof payload === 'object') return payload.warm === true || payload.warm === 'true'
+  try {
+    const parsed = JSON.parse(payload)
+    return parsed.warm === true || parsed.warm === 'true'
+  } catch {
+    return false
+  }
+}
+
 function blockTitleFromParams (params) {
   return String(params.title || params.name || params.blockTitle || '').trim()
 }
@@ -60,6 +73,10 @@ async function main (params) {
   const logger = Core.Logger('block-storefront', { level: params.LOG_LEVEL || 'info' })
 
   try {
+    if (isWarmPing(params)) {
+      return { statusCode: 200, body: { message: 'action is live' } }
+    }
+
     const store = createPresetStore(params)
     const scope = store.scope()
     const operation = String(params.operation || 'list').trim().toLowerCase()

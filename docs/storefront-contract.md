@@ -6,7 +6,7 @@ Headless consumers (EDS, API Mesh, storefront servers) must **not** use Admin IM
 
 | Action | Auth |
 |--------|------|
-| **`block-storefront`** (list / get presets) | **Public** — no secret; only **enabled** presets are returned |
+| **`block-storefront`** (list / get presets) | **Public** — no secret; only **enabled** presets are returned. A 4-minute alarm sends `warm: true`. The action returns `{ "message": "action is live" }` and does not open the database |
 | **`block-evaluate`** (PDP placement) | **`x-conditional-block-secret`** = App Builder `EVALUATE_SHARED_SECRET` |
 
 Browsers should call **API Mesh GraphQL**, not App Builder URLs directly. Mesh holds the evaluate secret for placement queries only ([`../api-mesh/`](../api-mesh/)).

@@ -4,6 +4,19 @@ const { ALL_STORE_VIEWS } = require('../../lib/constants')
 const { createBrandStore, storefrontBrand } = require('../../lib/brand-store')
 const { createBrandCache } = require('../../lib/brand-cache')
 
+function isWarmPing (params) {
+  if (params.warm === true || params.warm === 'true') return true
+  const payload = params.trigger_payload
+  if (!payload) return false
+  if (typeof payload === 'object') return payload.warm === true || payload.warm === 'true'
+  try {
+    const parsed = JSON.parse(payload)
+    return parsed.warm === true || parsed.warm === 'true'
+  } catch {
+    return false
+  }
+}
+
 function lookupFrom (params) {
   const id = String(params.id || '').trim()
   const name = String(params.name || '').trim()
@@ -65,6 +78,10 @@ async function main (params) {
   const logger = Core.Logger('brand-storefront', { level: params.LOG_LEVEL || 'info' })
 
   try {
+    if (isWarmPing(params)) {
+      return { statusCode: 200, body: { message: 'action is live' } }
+    }
+
     const operation = String(params.operation || '').trim().toLowerCase()
     const storeViewCode = storeViewFrom(params)
     const cache = await createBrandCache(params)
