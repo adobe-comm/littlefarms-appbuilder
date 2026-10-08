@@ -3,7 +3,6 @@
  * URLs and secret: context.secrets (see secrets.yaml + --secrets on deploy).
  */
 
-var PLACEMENT_BLOCK_TYPE = 'littlefarms_placement'
 var SECRET_HEADER = 'x-conditional-block-secret'
 
 function postJson (url, secret, body, options) {
@@ -29,31 +28,6 @@ function postJson (url, secret, body, options) {
       }
       return payload
     })
-  })
-}
-
-function mapPlacementToBlock (entry) {
-  if (!entry) return null
-  return {
-    id: entry.id,
-    name: entry.name,
-    blockType: PLACEMENT_BLOCK_TYPE,
-    enabled: true,
-    brandsList: null,
-    featuredRecommended: null,
-    placement: {
-      priority: Number(entry.priority) || 0,
-      title: entry.title || '',
-      contentHtml: entry.contentHtml || '',
-      targetSkus: Array.isArray(entry.targetSkus) ? entry.targetSkus : []
-    }
-  }
-}
-
-function filterByBlockType (blocks, blockType) {
-  if (!blockType) return blocks
-  return blocks.filter(function (block) {
-    return block.blockType === blockType
   })
 }
 
@@ -384,41 +358,21 @@ module.exports = {
         }
       },
       littleFarmsBlocks: {
-        resolve: function (_root, args, context) {
+        resolve: function (_root, _args, context) {
           var secrets = secretsFrom(context)
-          var sku = String(args.sku || '').trim()
-          var blockType = String(args.blockType || '').trim()
-
-          if (sku) {
-            return postJson(
-              secrets.LITTLEFARMS_BLOCK_EVALUATE_URL,
-              secrets.EVALUATE_SHARED_SECRET,
-              { sku: sku, storeViewCode: 'default' }
-            ).then(function (payload) {
-              var blocks = (payload.blocks || [])
-                .map(mapPlacementToBlock)
-                .filter(Boolean)
-              return enrichBlocks(filterByBlockType(blocks, blockType || PLACEMENT_BLOCK_TYPE), secrets)
-            })
-          }
-
-          var listBody = { operation: 'list', resolveConditions: true }
-          if (blockType) {
-            listBody.blockType = blockType
-          }
+          var listBody = { operation: 'list' }
           return postJson(
             secrets.LITTLEFARMS_BLOCK_STOREFRONT_URL,
             secrets.EVALUATE_SHARED_SECRET,
             listBody,
             { skipSecret: true }
           ).then(function (payload) {
-            var blocks = (payload.blocks || []).map(function (block) {
+            return (payload.blocks || []).map(function (block) {
               if (block.placement === undefined) {
                 block.placement = null
               }
               return block
             })
-            return enrichBlocks(blocks, secrets)
           })
         }
       },

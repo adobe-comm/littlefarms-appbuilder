@@ -1,12 +1,11 @@
 const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
-const { validateStorefrontSecretUnlessPublicPresetRead } = require('../../lib/storefront-auth')
 const { createPresetStore } = require('../../lib/preset-store')
 const { withCommerceCoreGraphqlUrl } = require('../../lib/enrich-commerce-params')
-const { enrichPresetForStorefront, enrichPresetsForStorefront } = require('../../lib/enrich-storefront-blocks')
+const { enrichPresetForStorefront } = require('../../lib/enrich-storefront-blocks')
+const { toPublicBlock } = require('../../lib/public-preset')
 const { createPresetResultCache } = require('../../lib/preset-result-cache')
 const { createAttributeCatalog } = require('../../lib/attribute-catalog')
-const { DEFAULT_BLOCK_TYPE } = require('../../lib/constants')
 
 function blockTitleFromParams (params) {
   return String(params.title || params.name || params.blockTitle || '').trim()
@@ -61,18 +60,12 @@ async function main (params) {
   const logger = Core.Logger('block-storefront', { level: params.LOG_LEVEL || 'info' })
 
   try {
-    params = await withCommerceCoreGraphqlUrl(params)
-
-    const auth = validateStorefrontSecretUnlessPublicPresetRead(params)
-    if (!auth.valid) {
-      return errorResponse(auth.statusCode, auth.error, logger)
-    }
-
     const store = createPresetStore(params)
     const scope = store.scope()
     const operation = String(params.operation || 'list').trim().toLowerCase()
 
     if (operation === 'get') {
+      params = await withCommerceCoreGraphqlUrl(params)
       let preset
       try {
         preset = await loadPresetForGet(store, scope, params)
@@ -88,24 +81,19 @@ async function main (params) {
       return { statusCode: 200, body: { block } }
     }
 
-    const blockType = String(params.blockType || '').trim()
     const listCache = await createPresetResultCache(params)
-    const cached = await listCache.getList(scope.environmentId, blockType)
+    const cached = await listCache.getList(scope.environmentId)
     if (cached) {
-      logger.info(`Block list served from State for ${blockType || 'all types'}`)
+      logger.info('Block list served from State')
       return { statusCode: 200, body: cached }
     }
 
-    let presets = await store.list(scope)
-    presets = presets.filter(preset => preset.enabled !== false)
-    if (blockType) {
-      presets = presets.filter(preset => (preset.blockType || DEFAULT_BLOCK_TYPE) === blockType)
-    }
+    const presets = (await store.list(scope)).filter(preset => preset.enabled !== false)
 
-    const blocks = await enrichPresetsForStorefront(presets, params, logger)
+    const blocks = presets.map(toPublicBlock)
     const body = { blocks }
-    await listCache.putList(scope.environmentId, blockType, body)
-    logger.info(`Stored ${blocks.length} blocks in State for ${blockType || 'all types'}`)
+    await listCache.putList(scope.environmentId, body)
+    logger.info(`Stored ${blocks.length} blocks in State`)
     return {
       statusCode: 200,
       body

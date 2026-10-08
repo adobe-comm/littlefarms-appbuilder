@@ -23,16 +23,10 @@ Used for **Brands List**, **Featured/Recommended** presets created in Blocks Man
 POST /api/v1/web/littlefarms-appbuilder/block-storefront
 Content-Type: application/json
 
-{"operation":"list","resolveConditions":true}
+{"operation":"list"}
 ```
 
-Optional filter:
-
-```json
-{"operation":"list","blockType":"littlefarms_brands_list","resolveConditions":true}
-```
-
-Set `"resolveConditions":false` to return block metadata only (no Commerce SKU resolution).
+The list returns enabled presets only. It does not call Commerce and does not fill `productSkus`. The list is stored in App Builder State for the maximum TTL (365 days). A block save, a block delete, or **block-cache-flush** deletes that entry. Load one block with `operation: "get"` to resolve SKUs.
 
 ### Get one block
 
@@ -95,9 +89,9 @@ By **title** (Admin **Title** / `name`; case-insensitive):
 }
 ```
 
-For **`littlefarms_featured_recommended`**, when `resolveConditions` is true (default), the action evaluates conditions against Commerce (same logic as Admin **Fetch SKUs**), returns matching SKUs in **`productSkus`**, and caches the SKU list in **App Builder State** for **`PRESET_RESULT_CACHE_TTL`** seconds (default **600** / 10 minutes). Cache for a block is cleared when the block is saved or deleted, or when an admin runs **`block-cache-flush`**.
+For **`littlefarms_featured_recommended`**, `operation: "get"` with `resolveConditions: true` (the default on get) evaluates conditions against Commerce, returns matching SKUs in **`productSkus`**, and caches that SKU list in **App Builder State** for **`PRESET_RESULT_CACHE_TTL`** seconds (default **600** / 10 minutes). Cache for a block is cleared when the block is saved or deleted, or when an admin runs **`block-cache-flush`**. `operation: "list"` does not resolve SKUs.
 
-API Mesh then loads product details for those SKUs, and for placement `targetSkus`, with Live Search `productSearch` (`phrase: ""`, filter attribute `sku` `in` the SKU list). `littleFarmsBlock` accepts an optional `filter` list (`attribute` plus `eq`, `in`, `startsWith`, `contains`, or `range`). The mesh sends those clauses first and always appends the block SKU clause. A client `sku` clause is rejected. The mesh returns them on **`products`** in the same order as the SKUs, leaving out SKUs that the extra filter excluded. **`productsStatus`** is `ok`, `empty`, `error`, or `commerce_unconfigured`. The SKU attribute, and every attribute in `filter`, must be filterable in search. Set `COMMERCE_CORE_GRAPHQL_URL` in mesh secrets. The REST action itself still returns SKUs only.
+API Mesh loads product details for a single block’s SKUs with Live Search `productSearch` (`phrase: ""`, filter attribute `sku` `in` the SKU list). `littleFarmsBlocks` does not call `productSearch`. `littleFarmsBlock` accepts an optional `filter` list (`attribute` plus `eq`, `in`, `startsWith`, `contains`, or `range`). The mesh sends those clauses first and always appends the block SKU clause. A client `sku` clause is rejected. The mesh returns them on **`products`** in the same order as the SKUs, leaving out SKUs that the extra filter excluded. **`productsStatus`** is `ok`, `empty`, `error`, or `commerce_unconfigured`. The SKU attribute, and every attribute in `filter`, must be filterable in search. Set `COMMERCE_CORE_GRAPHQL_URL` in mesh secrets. The REST action itself still returns SKUs only.
 
 Disabled or unknown blocks return **404** on get.
 
@@ -156,11 +150,11 @@ Deploy the mesh in [`../api-mesh/`](../api-mesh/) to expose blocks-only GraphQL 
 ```graphql
 extend type Query {
   littleFarmsBlock(id: ID, title: String, blockId: Int, filter: [LittleFarmsProductSearchFilter!]): LittleFarmsBlock
-  littleFarmsBlocks(blockType: String, sku: String): [LittleFarmsBlock!]!
+  littleFarmsBlocks: [LittleFarmsBlock!]!
 }
 ```
 
-PDP rules use the same `LittleFarmsBlock` type with `blockType: "littlefarms_placement"` and `placement { … }`. Pass `sku` on `littleFarmsBlocks` for placements; omit it for Admin presets. The mesh sends the single store view to `block-evaluate`.
+`littleFarmsBlocks` takes no arguments and returns every enabled preset.
 
 Use the mesh endpoint for block fields; use Commerce GraphQL separately for `products` until you merge sources. Setup: [`../api-mesh/README.md`](../api-mesh/README.md).
 

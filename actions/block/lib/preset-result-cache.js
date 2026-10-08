@@ -2,13 +2,14 @@ const stateLib = require('@adobe/aio-lib-state')
 const { DEFAULT_PRESET_RESULT_CACHE_TTL } = require('./constants')
 
 const encode = value => Buffer.from(String(value)).toString('base64url')
+const LIST_CACHE_TTL = stateLib.MAX_TTL
 
 function cacheKey (blockId) {
   return `preset-result.${encode(blockId)}`
 }
 
-function listCacheKey (environmentId, blockType) {
-  return `preset-result.list.${encode(environmentId || 'default')}.${encode(blockType || '*')}`
+function listCacheKey (environmentId) {
+  return `preset-result.list.${encode(environmentId || 'default')}.${encode('*')}`
 }
 
 async function createPresetResultCache (params, stateFactory = stateLib.init) {
@@ -34,8 +35,8 @@ async function createPresetResultCache (params, stateFactory = stateLib.init) {
       state.put(cacheKey(blockId), JSON.stringify(value), { ttl }),
     invalidate: blockId => state.delete(cacheKey(blockId)),
     invalidateAll: () => state.deleteAll({ match: 'preset-result.*' }),
-    async getList (environmentId, blockType) {
-      const result = await state.get(listCacheKey(environmentId, blockType))
+    async getList (environmentId) {
+      const result = await state.get(listCacheKey(environmentId))
       const raw = result?.value
       if (raw == null || raw === '') return null
       if (typeof raw === 'string') {
@@ -47,8 +48,8 @@ async function createPresetResultCache (params, stateFactory = stateLib.init) {
       }
       return raw
     },
-    putList: (environmentId, blockType, value) =>
-      state.put(listCacheKey(environmentId, blockType), JSON.stringify(value), { ttl }),
+    putList: (environmentId, value) =>
+      state.put(listCacheKey(environmentId), JSON.stringify(value), { ttl: LIST_CACHE_TTL }),
     invalidateLists: () => state.deleteAll({ match: 'preset-result.list.*' })
   }
 }

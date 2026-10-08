@@ -1,6 +1,4 @@
 const { toPublicBlock } = require('./public-preset')
-const { createPresetResultCache } = require('./preset-result-cache')
-const { createAttributeCatalog } = require('./attribute-catalog')
 const { isConditionalPreset, resolveConditionResultSkus } = require('./resolve-preset-skus')
 
 function shouldResolveConditions (params) {
@@ -55,22 +53,7 @@ async function enrichPresetForStorefront (preset, params, context) {
   return block
 }
 
-async function enrichPresetsForStorefront (presets, params, logger) {
-  if (!shouldResolveConditions(params)) {
-    return presets.map(toPublicBlock)
-  }
-
-  const context = {
-    logger,
-    cache: await createPresetResultCache(params),
-    catalog: createAttributeCatalog(params)
-  }
-
-  return Promise.all(presets.map(preset => enrichPresetForStorefront(preset, params, context)))
-}
-
 module.exports = {
   shouldResolveConditions,
-  enrichPresetForStorefront,
-  enrichPresetsForStorefront
+  enrichPresetForStorefront
 }

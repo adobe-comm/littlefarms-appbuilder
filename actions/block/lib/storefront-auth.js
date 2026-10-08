@@ -15,13 +15,7 @@ function validateStorefrontSecret (params) {
   return { valid: true }
 }
 
-/** Preset list/get (`block-storefront`) is public; only enabled presets are returned. */
-function validateStorefrontSecretUnlessPublicPresetRead () {
-  return { valid: true }
-}
-
 module.exports = {
   getProvidedStorefrontSecret,
-  validateStorefrontSecret,
-  validateStorefrontSecretUnlessPublicPresetRead
+  validateStorefrontSecret
 }

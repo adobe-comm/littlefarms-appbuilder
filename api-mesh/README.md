@@ -9,10 +9,9 @@ EDS / server
     → Little Farms API Mesh (this config)
         → resolvers.js
             → block-storefront (presets: list / get)
-            → block-evaluate (PDP placements when sku is set)
 ```
 
-**Preset list/get** is public on `block-storefront` (no shared secret). **PDP placement** (`sku`) still uses `block-evaluate` with a secret held in mesh secrets only. The mesh sends the single store view to that action.
+**Preset list/get** is public on `block-storefront` (no shared secret). `littleFarmsBlocks` takes no arguments and returns every enabled preset.
 
 Browser clients should use this mesh endpoint (with CORS); do not call App Builder action URLs from the shopper page.
 
@@ -21,8 +20,7 @@ Browser clients should use this mesh endpoint (with CORS); do not call App Build
 | Field | Purpose |
 |--------|---------|
 | `littleFarmsBlock(blockId:)` / `id` / `title` | One preset by Admin **Block ID**, UUID, or title. Optional `filter` is added to Live Search `productSearch` together with the block SKU list. Featured and placement blocks also include **`products`** |
-| `littleFarmsBlocks(blockType)` | Enabled presets; optional type filter. Featured blocks include **`productSkus`** and Live Search **`products`** |
-| `littleFarmsBlocks(sku)` | PDP placement blocks (`blockType`: `littlefarms_placement`) |
+| `littleFarmsBlocks` | Every enabled preset. No arguments. Returns block fields only. SKUs and `products` come from `littleFarmsBlock` |
 | `littleFarmsBrandsList` | Every active brand as `id`, `name`, `slug`, and `image`. Inactive, hidden, and removed brands are left out. The action stores that directory in State until a brand save flushes it |
 | `littleFarmsBrand` / `littleFarmsBrands` | One brand, or one page of full brand records. `littleFarmsBrands` returns `page`, `pageSize`, `total`, `pageCount`, and `items`. It accepts `name`, `isActive`, `isNewBrand`, `isTopBrand`, `isFeatured`, `showInBrandListWidget`, and `showInBrandSliderWidget`. Omit a flag to skip that filter. Omit `isActive` to keep active brands only |
 
@@ -60,22 +58,11 @@ query {
 
 ```graphql
 {
-  littleFarmsBlocks(blockType: "littlefarms_brands_list") {
+  littleFarmsBlocks {
     id
     name
-    brandsList { url items { name link image } }
-  }
-}
-```
-
-**List PDP placements:**
-
-```graphql
-query ($sku: String!) {
-  littleFarmsBlocks(sku: $sku) {
-    id
     blockType
-    placement { title targetSkus contentHtml priority products { sku name urlKey images { url } priceRange { minimum { final { value currency } } } } }
+    enabled
   }
 }
 ```
@@ -167,8 +154,7 @@ You should see `{context.secrets.LITTLEFARMS_BLOCK_STOREFRONT_URL}` in the publi
 
 Mesh resolvers POST JSON to:
 
-- `block-storefront` — `{"operation":"get","id":"…"}` / `{"operation":"list","blockType":"…"}`
-- `block-evaluate` — `{"sku":"…","storeViewCode":"…"}`
+- `block-storefront` — `{"operation":"get","blockId":3,"resolveConditions":true}` / `{"operation":"list"}`
 
 See [`../docs/storefront-contract.md`](../docs/storefront-contract.md).
 
@@ -182,7 +168,7 @@ See [`../docs/storefront-contract.md`](../docs/storefront-contract.md).
 
 ## Adding product details
 
-`littleFarmsBlock` and `littleFarmsBlocks` keep the SKU list from App Builder, then the mesh calls Commerce Live Search [`productSearch`](https://developer.adobe.com/commerce/webapi/graphql/schema/live-search/queries/product-search) with `phrase: ""` and `filter: [{ attribute: "sku", in: [...] }]`. `littleFarmsBlock` also accepts `filter`. Those clauses are sent first, and the SKU clause is always appended. The SKU attribute, and any attribute in `filter`, must be filterable in search. Results are returned in the block’s SKU order as `products`. `productsStatus` is `ok`, `empty`, `error`, or `commerce_unconfigured`.
+`littleFarmsBlock` loads that block’s SKUs from App Builder, then the mesh calls Commerce Live Search [`productSearch`](https://developer.adobe.com/commerce/webapi/graphql/schema/live-search/queries/product-search) with `phrase: ""` and `filter: [{ attribute: "sku", in: [...] }]`. `littleFarmsBlocks` returns the block list only and does not call `productSearch`. `littleFarmsBlock` also accepts `filter`. Those clauses are sent first, and the SKU clause is always appended. The SKU attribute, and any attribute in `filter`, must be filterable in search. Results are returned in the block’s SKU order as `products`. `productsStatus` is `ok`, `empty`, `error`, or `commerce_unconfigured`.
 
 Paste the same Commerce GraphQL endpoint the admin app uses into `secrets.yaml` before the next mesh update:
 

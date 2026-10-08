@@ -97,10 +97,7 @@ input LittleFarmsProductSearchFilter {
 
 extend type Query {
   littleFarmsBlock(id: ID, title: String, blockId: Int, filter: [LittleFarmsProductSearchFilter!]): LittleFarmsBlock
-  littleFarmsBlocks(
-    blockType: String
-    sku: String
-  ): [LittleFarmsBlock!]!
+  littleFarmsBlocks: [LittleFarmsBlock!]!
   littleFarmsBrand(id: ID, name: String, urlAlias: String): LittleFarmsBrand
   littleFarmsBrands(
     widget: LittleFarmsBrandWidget
