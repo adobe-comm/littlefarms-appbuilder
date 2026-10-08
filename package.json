@@ -38,8 +38,7 @@
     "lint:fix": "npm run lint -- --fix",
     "start": "aio app run -e commerce/backend-ui/2",
     "dev": "aio app dev -e commerce/backend-ui/2",
-    "deploy-full": "aio app deploy",
-    "deploy-actions": " aio app deploy --no-web-assets --no-build --no-publish",
+    "deploy": "aio app deploy",
     "collection-list": "aio app db collection list",
     "update-mesh": "cd api-mesh && aio api-mesh update meshConfig.json -s secrets.yaml"
   },
