@@ -1,6 +1,6 @@
 const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
-const { DEFAULT_STORE_VIEW } = require('../../lib/constants')
+const { ALL_STORE_VIEWS } = require('../../lib/constants')
 const { createBrandStore, storefrontBrand } = require('../../lib/brand-store')
 const { createBrandCache } = require('../../lib/brand-cache')
 
@@ -18,8 +18,38 @@ function widgetFrom (value) {
   return ''
 }
 
+function optionalBoolean (value, label) {
+  if (value == null || value === '') return undefined
+  if (value === true || value === 'true' || value === 1 || value === '1') return true
+  if (value === false || value === 'false' || value === 0 || value === '0') return false
+  const error = new Error(`${label} must be true or false.`)
+  error.statusCode = 400
+  throw error
+}
+
+function criteriaFrom (params) {
+  return {
+    name: String(params.name || '').trim(),
+    isActive: optionalBoolean(params.isActive, 'isActive'),
+    isNewBrand: optionalBoolean(params.isNewBrand, 'isNewBrand'),
+    isTopBrand: optionalBoolean(params.isTopBrand, 'isTopBrand'),
+    isFeatured: optionalBoolean(params.isFeatured, 'isFeatured'),
+    showInBrandListWidget: optionalBoolean(params.showInBrandListWidget, 'showInBrandListWidget'),
+    showInBrandSliderWidget: optionalBoolean(params.showInBrandSliderWidget, 'showInBrandSliderWidget')
+  }
+}
+
+function criteriaCacheKey (criteria) {
+  const parts = []
+  if (criteria.name) parts.push(`name=${criteria.name.toLowerCase()}`)
+  for (const key of ['isActive', 'isNewBrand', 'isTopBrand', 'isFeatured', 'showInBrandListWidget', 'showInBrandSliderWidget']) {
+    if (criteria[key] != null) parts.push(`${key}=${criteria[key]}`)
+  }
+  return parts.join('&')
+}
+
 function storeViewFrom (params) {
-  return String(params.storeViewCode || DEFAULT_STORE_VIEW).trim() || DEFAULT_STORE_VIEW
+  return String(params.storeViewCode || ALL_STORE_VIEWS).trim() || ALL_STORE_VIEWS
 }
 
 async function rememberBrand (cache, storeViewCode, brand) {
@@ -86,9 +116,13 @@ async function main (params) {
     if (operation === 'list') {
       const widget = widgetFrom(params.widget)
       if (!widget) return errorResponse(400, 'widget must be LIST, SLIDER, or omitted.', logger)
+      const criteria = criteriaFrom(params)
       const page = Math.max(1, Number(params.page) || 1)
       const pageSize = Math.min(50, Math.max(1, Number(params.pageSize) || 50))
-      const cacheWidget = `${widget}.${pageSize}.detail`
+      const criteriaKey = criteriaCacheKey(criteria)
+      const cacheWidget = criteriaKey
+        ? `${widget}.${pageSize}.detail.${Buffer.from(criteriaKey).toString('base64url')}`
+        : `${widget}.${pageSize}.detail`
       const cached = await cache.getWidgetPage(storeViewCode, cacheWidget, page)
       if (cached) return { statusCode: 200, body: cached }
 
@@ -99,7 +133,8 @@ async function main (params) {
         storeViewCode,
         widget: widget === 'ALL' ? undefined : widget,
         page,
-        pageSize
+        pageSize,
+        criteria
       })
       await cache.putWidgetPage(storeViewCode, cacheWidget, page, body)
       return { statusCode: 200, body }

@@ -97,6 +97,8 @@ By **title** (Admin **Title** / `name`; case-insensitive):
 
 For **`littlefarms_featured_recommended`**, when `resolveConditions` is true (default), the action evaluates conditions against Commerce (same logic as Admin **Fetch SKUs**), returns matching SKUs in **`productSkus`**, and caches the SKU list in **App Builder State** for **`PRESET_RESULT_CACHE_TTL`** seconds (default **600** / 10 minutes). Cache for a block is cleared when the block is saved or deleted, or when an admin runs **`block-cache-flush`**.
 
+API Mesh then loads product details for those SKUs, and for placement `targetSkus`, with Live Search `productSearch` (`phrase: ""`, filter attribute `sku` `in` the SKU list). `littleFarmsBlock` accepts an optional `filter` list (`attribute` plus `eq`, `in`, `startsWith`, `contains`, or `range`). The mesh sends those clauses first and always appends the block SKU clause. A client `sku` clause is rejected. The mesh returns them on **`products`** in the same order as the SKUs, leaving out SKUs that the extra filter excluded. **`productsStatus`** is `ok`, `empty`, `error`, or `commerce_unconfigured`. The SKU attribute, and every attribute in `filter`, must be filterable in search. Set `COMMERCE_CORE_GRAPHQL_URL` in mesh secrets. The REST action itself still returns SKUs only.
+
 Disabled or unknown blocks return **404** on get.
 
 ---
@@ -153,14 +155,102 @@ Deploy the mesh in [`../api-mesh/`](../api-mesh/) to expose blocks-only GraphQL 
 
 ```graphql
 extend type Query {
-  littleFarmsBlock(id: ID!): LittleFarmsBlock
-  littleFarmsBlocks(blockType: String, sku: String, storeViewCode: String): [LittleFarmsBlock!]!
+  littleFarmsBlock(id: ID, title: String, blockId: Int, filter: [LittleFarmsProductSearchFilter!]): LittleFarmsBlock
+  littleFarmsBlocks(blockType: String, sku: String): [LittleFarmsBlock!]!
 }
 ```
 
-PDP rules use the same `LittleFarmsBlock` type with `blockType: "littlefarms_placement"` and `placement { … }`. Pass `sku` and `storeViewCode` on `littleFarmsBlocks` for placements; omit them for Admin presets.
+PDP rules use the same `LittleFarmsBlock` type with `blockType: "littlefarms_placement"` and `placement { … }`. Pass `sku` on `littleFarmsBlocks` for placements; omit it for Admin presets. The mesh sends the single store view to `block-evaluate`.
 
 Use the mesh endpoint for block fields; use Commerce GraphQL separately for `products` until you merge sources. Setup: [`../api-mesh/README.md`](../api-mesh/README.md).
+
+### Brands
+
+`littleFarmsBrandsList` returns every active brand (`id`, `name`, `slug`, `image`).
+
+`littleFarmsBrands` returns one page of full brand records. `page` starts at 1. `pageSize` defaults to 50 and cannot be higher than 50. `total` is the number of brands that match the filters. `pageCount` is `total` divided by `pageSize`, rounded up. Ask for the next page while `page` is less than `pageCount`. Filters combine: a brand must match every argument that is set.
+
+```graphql
+query {
+  littleFarmsBrands(
+    name: "farm"
+    isActive: true
+    isFeatured: true
+    showInBrandListWidget: true
+    page: 1
+    pageSize: 50
+  ) {
+    page
+    pageSize
+    total
+    pageCount
+    items {
+      id
+      name
+      urlAlias
+      isNewBrand
+      isTopBrand
+      showInBrandSliderWidget
+    }
+  }
+}
+```
+
+| Argument | Match |
+|----------|--------|
+| `name` | Brand name contains this text, ignoring case |
+| `isActive` | Active flag. Omitted means active brands only |
+| `isNewBrand` | New brand flag |
+| `isTopBrand` | Top brand flag |
+| `isFeatured` | Featured flag |
+| `showInBrandListWidget` | Shown in the brand list widget |
+| `showInBrandSliderWidget` | Shown in the brand slider widget |
+
+`widget: LIST` and `widget: SLIDER` still apply with these filters. `pageSize` max is 50.
+
+These filters read `littlefarms_brands`. Create the indexes once from the repo root, in the Runtime namespace that owns the database. Add `--region` when `DB_REGION` is not `amer`. See [Brand database indexes](../README.md#brand-database-indexes).
+
+```bash
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"is_active":1,"optionLabel":1}' \
+  --name brand_active
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"is_new_brand":1,"optionLabel":1}' \
+  --name brand_new
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"is_top_brand":1,"optionLabel":1}' \
+  --name brand_top
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"is_featured":1,"optionLabel":1}' \
+  --name brand_featured
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"show_in_brand_list_widget":1,"optionLabel":1}' \
+  --name brand_list_widget
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"show_in_brand_slider_widget":1,"optionLabel":1}' \
+  --name brand_slider_widget
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"normalizedLabel":1}' \
+  --name brand_name
+```
+
+| Index | Speeds up |
+|-------|-----------|
+| `brand_active` | `isActive`, and the active-only `littleFarmsBrandsList` |
+| `brand_new` | `isNewBrand` |
+| `brand_top` | `isTopBrand` |
+| `brand_featured` | `isFeatured` |
+| `brand_list_widget` | `showInBrandListWidget` and `widget: LIST` |
+| `brand_slider_widget` | `showInBrandSliderWidget` and `widget: SLIDER` |
+| `brand_name` | `littleFarmsBrand(name:)` |
+
+`littleFarmsBrands(name:)` still matches the brand name as a contains search on the rows the flag indexes return. Confirm the indexes with `aio app db index list littlefarms_brands --json`.
 
 ---
 

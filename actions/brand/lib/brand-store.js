@@ -82,6 +82,18 @@ function dedupeOptions (options) {
 
 const READ_BATCH = 100
 const WRITE_BATCH = 40
+const SEARCH_FIELDS = ['optionLabel', 'url_alias', 'optionValue']
+
+function searchClause (search) {
+  const term = String(search || '').trim()
+  if (!term) return {}
+  const pattern = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return {
+    $or: SEARCH_FIELDS.map(field => ({
+      [field]: { $regex: pattern, $options: 'i' }
+    }))
+  }
+}
 
 function chunks (items, size) {
   const groups = []
@@ -190,8 +202,53 @@ function mergeBrand (base, override, storeViewCode) {
   return applyUseDefaultTitles(resolved)
 }
 
+function isActiveValue (value) {
+  return value !== false && value !== 'false' && value !== 0 && value !== '0'
+}
+
 function isVisible (doc) {
-  return Boolean(doc) && doc.hidden !== true && doc.optionRemoved !== true && doc.is_active !== false
+  return Boolean(doc) && doc.hidden !== true && doc.optionRemoved !== true && isActiveValue(doc.is_active)
+}
+
+function matchesCriteria (doc, criteria = {}) {
+  const name = String(criteria.name || '').trim().toLowerCase()
+  if (name && !String(doc.optionLabel || '').toLowerCase().includes(name)) return false
+  const flags = {
+    isActive: isActiveValue(doc.is_active),
+    isNewBrand: doc.is_new_brand === true,
+    isTopBrand: doc.is_top_brand === true,
+    isFeatured: doc.is_featured === true,
+    showInBrandListWidget: doc.show_in_brand_list_widget !== false,
+    showInBrandSliderWidget: doc.show_in_brand_slider_widget === true
+  }
+  for (const key of Object.keys(flags)) {
+    if (criteria[key] == null) continue
+    if (flags[key] !== criteria[key]) return false
+  }
+  return true
+}
+
+function criteriaDbFilter (criteria = {}, widget) {
+  const filter = {}
+  const flags = {
+    isActive: 'is_active',
+    isNewBrand: 'is_new_brand',
+    isTopBrand: 'is_top_brand',
+    isFeatured: 'is_featured',
+    showInBrandListWidget: 'show_in_brand_list_widget',
+    showInBrandSliderWidget: 'show_in_brand_slider_widget'
+  }
+  for (const [key, field] of Object.entries(flags)) {
+    if (criteria[key] === true || criteria[key] === false) filter[field] = criteria[key]
+  }
+  if (criteria.isActive == null && filter.is_active === undefined) filter.is_active = { $ne: false }
+  if (widget === 'LIST' && filter.show_in_brand_list_widget === undefined) {
+    filter.show_in_brand_list_widget = { $ne: false }
+  }
+  if (widget === 'SLIDER' && filter.show_in_brand_slider_widget === undefined) {
+    filter.show_in_brand_slider_widget = true
+  }
+  return filter
 }
 
 function matchesWidget (doc, widget) {
@@ -206,7 +263,7 @@ function slimBrand (doc) {
     name: doc.optionLabel,
     attributeCode: doc.attributeCode,
     urlAlias: doc.url_alias || '',
-    isActive: doc.is_active !== false,
+    isActive: isActiveValue(doc.is_active),
     isNewBrand: doc.is_new_brand === true,
     isTopBrand: doc.is_top_brand === true,
     isFeatured: doc.is_featured === true,
@@ -455,10 +512,14 @@ function createBrandStore (params, opener = openBrandDb) {
       return { inserted, updated: updates.length, removed }
     }),
 
-    pageAdmin: ({ attributeCode, storeViewCode = ALL_STORE_VIEWS, page, pageSize }) => withDb(async ({ brands }) => {
+    pageAdmin: ({ attributeCode, storeViewCode = ALL_STORE_VIEWS, page, pageSize, search }) => withDb(async ({ brands }) => {
       const paging = pageArgs(page, pageSize)
       if (!attributeCode) return { page: paging.page, pageSize: paging.pageSize, total: 0, items: [] }
-      const filter = baseFilter(attributeCode, { hidden: false, optionRemoved: false })
+      const filter = baseFilter(attributeCode, {
+        hidden: false,
+        optionRemoved: false,
+        ...searchClause(search)
+      })
       const [total, bases] = await Promise.all([
         brands.countDocuments(filter),
         brands.find(filter).sort({ optionLabel: 1 }).skip(paging.skip).limit(paging.pageSize).toArray()
@@ -526,12 +587,14 @@ function createBrandStore (params, opener = openBrandDb) {
     listDirectory: ({ attributeCode, storeViewCode = 'default' }) => withDb(async ({ brands }) => {
       if (!attributeCode) return { items: [] }
       const scope = storeViewCode || 'default'
-      const bases = await brands.find(baseFilter(attributeCode, {
+      const bases = await readMatches(brands, baseFilter(attributeCode, {
         hidden: false,
-        optionRemoved: false
-      })).project(projection([
+        optionRemoved: false,
+        is_active: { $ne: false }
+      }), [
         'optionValue', 'optionLabel', 'url_alias', 'image', 'is_active', 'hidden', 'optionRemoved'
-      ])).sort({ optionLabel: 1 }).toArray()
+      ])
+      bases.sort((left, right) => String(left.optionLabel).localeCompare(String(right.optionLabel)))
       const merged = await overlayPage(brands, environmentId, attributeCode, scope, bases)
       const items = merged.filter(isVisible).map(doc => ({
         id: String(doc.optionValue),
@@ -542,16 +605,21 @@ function createBrandStore (params, opener = openBrandDb) {
       return { items }
     }),
 
-    pageStorefront: ({ attributeCode, storeViewCode = 'default', widget, page, pageSize }) => withDb(async ({ brands }) => {
+    pageStorefront: ({ attributeCode, storeViewCode = 'default', widget, page, pageSize, criteria = {} }) => withDb(async ({ brands }) => {
       const paging = pageArgs(page, pageSize)
       if (!attributeCode) return { page: paging.page, pageSize: paging.pageSize, total: 0, items: [] }
       const scope = storeViewCode || 'default'
       const bases = await brands.find(baseFilter(attributeCode, {
         hidden: false,
-        optionRemoved: false
+        optionRemoved: false,
+        ...criteriaDbFilter(criteria, widget)
       })).project(projection(PAGE_FIELDS)).sort({ optionLabel: 1 }).toArray()
       const merged = await overlayPage(brands, environmentId, attributeCode, scope, bases)
-      const visible = merged.filter(doc => isVisible(doc) && matchesWidget(doc, widget))
+      const visible = merged.filter(doc => {
+        if (!doc || doc.hidden === true || doc.optionRemoved === true) return false
+        if (criteria.isActive == null && !isVisible(doc)) return false
+        return matchesWidget(doc, widget) && matchesCriteria(doc, criteria)
+      })
       visible.sort((left, right) => {
         if (widget === 'SLIDER' && left.slider_position !== right.slider_position) {
           return left.slider_position - right.slider_position
@@ -650,6 +718,7 @@ module.exports = {
   openBrandDb,
   mergeBrand,
   isVisible,
+  matchesCriteria,
   slimBrand,
   storefrontBrand,
   sanitizeFields,

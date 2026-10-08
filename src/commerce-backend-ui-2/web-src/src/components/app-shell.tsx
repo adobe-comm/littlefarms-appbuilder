@@ -2,8 +2,6 @@ import type { ReactNode } from "react";
 import {
   appModules,
   defaultAppModuleId,
-  getAppModule,
-  littleFarmsLogo,
 } from "../modules/registry.ts";
 
 type AppShellProps = {
@@ -13,17 +11,11 @@ type AppShellProps = {
 };
 
 export function AppShell({ activeModuleId, onModuleChange, children }: AppShellProps) {
-  const activeModule = getAppModule(activeModuleId);
   const visibleModules = appModules.filter(module => module.available);
 
   return (
     <div className="lf-app-shell">
       <aside className="lf-module-rail" aria-label="Little Farms Admin features">
-        <div className="lf-module-rail-brand">
-          <img src={littleFarmsLogo} alt="Little Farms" className="lf-logo" />
-          <span className="lf-brand-name">Little Farms</span>
-          <span className="lf-brand-subtitle">Admin</span>
-        </div>
         <p className="lf-module-rail-heading">Features</p>
         <nav className="lf-module-nav">
           {visibleModules.map(module => (
@@ -38,9 +30,6 @@ export function AppShell({ activeModuleId, onModuleChange, children }: AppShellP
             </button>
           ))}
         </nav>
-        {activeModule && (
-          <p className="lf-module-active-hint">Viewing: {activeModule.pageTitle}</p>
-        )}
       </aside>
       <div className="lf-app-main">{children}</div>
     </div>

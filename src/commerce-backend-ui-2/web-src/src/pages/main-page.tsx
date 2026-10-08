@@ -41,7 +41,7 @@ type AttributeField = {
   group: "common" | "custom";
   options: AttributeOption[];
 };
-type CategoryChoice = { id: string; label: string };
+type CategoryChoice = { id: string; label: string; name?: string; parentId?: string; productCount?: number | null };
 type ProductChoice = { sku: string; name: string };
 type ProductRow = ProductChoice & { id: string; typeId: string; attributeSetId: string };
 type CatalogPage = { items: ProductRow[]; total: number; page: number; pageSize: number };
@@ -66,9 +66,104 @@ type AdminView =
 type BlockEditSection = "frontend-properties" | "block-options";
 
 const PAGE_SIZE = 20;
+
+type BlockListFilters = {
+  blockIdFrom: string;
+  blockIdTo: string;
+  createdFrom: string;
+  createdTo: string;
+  title: string;
+  enabled: "" | "1" | "0";
+};
+
+const emptyBlockFilters = (): BlockListFilters => ({
+  blockIdFrom: "",
+  blockIdTo: "",
+  createdFrom: "",
+  createdTo: "",
+  title: "",
+  enabled: "",
+});
+
+function presetMatchesFilters(preset: SavedCondition, keyword: string, filters: BlockListFilters): boolean {
+  const term = keyword.trim().toLowerCase();
+  if (term) {
+    const haystack = `${preset.name} ${displayBlockId(preset)}`.toLowerCase();
+    if (!haystack.includes(term)) return false;
+  }
+  const title = filters.title.trim().toLowerCase();
+  if (title && !preset.name.toLowerCase().includes(title)) return false;
+  if (filters.enabled === "1" && preset.enabled === false) return false;
+  if (filters.enabled === "0" && preset.enabled !== false) return false;
+
+  const blockId = displayBlockId(preset);
+  const blockNumber = /^\d+$/.test(blockId) ? Number(blockId) : null;
+  if (filters.blockIdFrom.trim()) {
+    const from = Number(filters.blockIdFrom);
+    if (blockNumber == null || !Number.isFinite(from) || blockNumber < from) return false;
+  }
+  if (filters.blockIdTo.trim()) {
+    const to = Number(filters.blockIdTo);
+    if (blockNumber == null || !Number.isFinite(to) || blockNumber > to) return false;
+  }
+
+  const createdRaw = preset.createdAt || preset.updatedAt;
+  const created = createdRaw ? new Date(createdRaw) : null;
+  const createdTime = created && !Number.isNaN(created.getTime()) ? created.getTime() : null;
+  if (filters.createdFrom) {
+    const from = new Date(`${filters.createdFrom}T00:00:00`).getTime();
+    if (createdTime == null || createdTime < from) return false;
+  }
+  if (filters.createdTo) {
+    const to = new Date(`${filters.createdTo}T23:59:59`).getTime();
+    if (createdTime == null || createdTime > to) return false;
+  }
+  return true;
+}
+
+const blockColumns = [
+  { id: "blockId", label: "Block ID" },
+  { id: "title", label: "Title" },
+  { id: "createdAt", label: "Created At" },
+  { id: "enabled", label: "Enabled" },
+  { id: "action", label: "Action" },
+] as const;
+
+type BlockColumnId = (typeof blockColumns)[number]["id"];
+
+const defaultBlockColumns = (): Record<BlockColumnId, boolean> => ({
+  blockId: true,
+  title: true,
+  createdAt: true,
+  enabled: true,
+  action: true,
+});
+
+function appliedFilterLabels(keyword: string, filters: BlockListFilters): string[] {
+  const labels: string[] = [];
+  if (keyword.trim()) labels.push(`Keyword: ${keyword.trim()}`);
+  if (filters.blockIdFrom.trim() || filters.blockIdTo.trim()) {
+    const range = [
+      filters.blockIdFrom.trim() ? `from ${filters.blockIdFrom.trim()}` : "",
+      filters.blockIdTo.trim() ? `to ${filters.blockIdTo.trim()}` : "",
+    ].filter(Boolean).join(" ");
+    labels.push(`Block ID: ${range}`);
+  }
+  if (filters.createdFrom || filters.createdTo) {
+    const range = [
+      filters.createdFrom ? `from ${filters.createdFrom}` : "",
+      filters.createdTo ? `to ${filters.createdTo}` : "",
+    ].filter(Boolean).join(" ");
+    labels.push(`Created At: ${range}`);
+  }
+  if (filters.title.trim()) labels.push(`Title: ${filters.title.trim()}`);
+  if (filters.enabled === "1") labels.push("Enabled: Yes");
+  if (filters.enabled === "0") labels.push("Enabled: No");
+  return labels;
+}
 const blockEditSections = [
   { id: "frontend-properties", label: "Frontend Properties" },
-  { id: "block-options", label: "Block Options" },
+  { id: "block-options", label: "Widget Options" },
 ] as const;
 
 const MAX_GROUP_DEPTH = 3;
@@ -139,6 +234,30 @@ function formatCreatedAt(iso?: string): string {
   });
 }
 
+type EditorBaseline = {
+  name: string;
+  enabled: boolean;
+  rule: Rule;
+  brandsLogic: BrandsListLogic;
+};
+
+function cloneDraft<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function emptyBaseline(): EditorBaseline {
+  return { name: "", enabled: true, rule: emptyRule(), brandsLogic: emptyBrandsListLogic() };
+}
+
+function uniqueCopyName(name: string, existing: SavedCondition[]): string {
+  const names = new Set(existing.map(item => item.name.toLowerCase()));
+  const base = `${name} - copy`;
+  if (!names.has(base.toLowerCase())) return base;
+  let index = 2;
+  while (names.has(`${base} ${index}`.toLowerCase())) index += 1;
+  return `${base} ${index}`;
+}
+
 function presetLookupId(preset: SavedCondition): string {
   if (preset.blockId) return String(preset.blockId);
   if (/^\d+$/.test(preset.id)) return preset.id;
@@ -183,7 +302,7 @@ function AttributeChoices({
   ] as const;
   return (
     <select value={value} onChange={event => onChange(event.target.value)}>
-      <option value="">Select an attribute</option>
+      <option value="">Please choose a condition to add.</option>
       {allowCombination && <option value={COMBINATION}>Conditions Combination</option>}
       {groups.map(([group, label]) => (
         <optgroup key={group} label={label}>
@@ -208,7 +327,7 @@ function ProductChooser({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState<CatalogQuery>(emptyCatalogQuery());
   const [draft, setDraft] = useState<CatalogQuery>(emptyCatalogQuery());
-  const [page, setPage] = useState<CatalogPage>({ items: [], total: 0, page: 1, pageSize: 50 });
+  const [page, setPage] = useState<CatalogPage>({ items: [], total: 0, page: 1, pageSize: 20 });
   const [picked, setPicked] = useState<string[]>(selected);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -239,71 +358,229 @@ function ProductChooser({
     setPicked(current => current.includes(sku) ? current.filter(item => item !== sku) : [...current, sku]);
   }
 
-  if (!open) {
-    return <button type="button" className="chooser-open" aria-label="Choose products" onClick={openChooser}>▦</button>;
+  const pageSize = page.pageSize || 20;
+  const lastPage = Math.max(1, Math.ceil(page.total / pageSize) || 1);
+  const pageSkus = page.items.map(product => product.sku);
+  const allPicked = pageSkus.length > 0 && pageSkus.every(sku => picked.includes(sku));
+  const typeLabel = (typeId: string) => ({
+    simple: "Simple Product",
+    configurable: "Configurable Product",
+    virtual: "Virtual Product",
+    bundle: "Bundle Product",
+    grouped: "Grouped Product",
+  }[typeId] || typeId);
+
+  return (
+    <div className="sku-condition">
+      <div className="rule-value">
+        <input
+          value={selected.join(",")}
+          aria-label="SKU"
+          onChange={event => {
+            const next = valuesOf(event.target.value);
+            onChange(next);
+            setPicked(next);
+          }}
+        />
+        <button type="button" className="chooser-open" aria-label="Choose products" aria-expanded={open} onClick={() => open ? setOpen(false) : openChooser()}>▦</button>
+        <button type="button" className="rule-confirm" aria-label="Apply" onClick={() => { onChange(picked); setOpen(false); }}>✓</button>
+      </div>
+      {open ? (
+        <div className="chooser-panel" role="dialog" aria-label="Choose products">
+          {loading ? <CommerceLoader cover="local" /> : null}
+          <div className="chooser-toolbar">
+            <button type="button" className="chooser-search" onClick={() => void load({ ...draft, page: 1 })}>Search</button>
+            <button type="button" className="chooser-reset" onClick={() => { const next = emptyCatalogQuery(); setDraft(next); void load(next); }}>Reset Filter</button>
+            <span className="chooser-count">{page.total} records found</span>
+            <div className="admin-pager">
+              <label>
+                <select value={pageSize} disabled aria-label="Records per page">
+                  <option value={pageSize}>{pageSize}</option>
+                </select>
+                <span>per page</span>
+              </label>
+              <button type="button" disabled={query.page <= 1 || loading} onClick={() => void load({ ...query, page: query.page - 1 })} aria-label="Previous page">‹</button>
+              <input aria-label="Current page" value={query.page} readOnly />
+              <span>of {lastPage}</span>
+              <button type="button" disabled={query.page >= lastPage || loading} onClick={() => void load({ ...query, page: query.page + 1 })} aria-label="Next page">›</button>
+            </div>
+          </div>
+          {error ? <p className="message" role="status">{error}</p> : null}
+          <div className="admin-grid-wrap">
+            <table className="admin-grid chooser-grid">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" checked={allPicked} aria-label="Select page" onChange={event => {
+                    setPicked(current => event.target.checked
+                      ? [...new Set([...current, ...pageSkus])]
+                      : current.filter(sku => !pageSkus.includes(sku)));
+                  }} /></th>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>Attribute Set</th>
+                  <th>SKU</th>
+                  <th>Product</th>
+                </tr>
+                <tr className="chooser-filters">
+                  <th><select aria-label="Match" defaultValue="any"><option value="any">Any</option></select></th>
+                  <th><input aria-label="ID" value={draft.entityId} onChange={event => setDraft({ ...draft, entityId: event.target.value })} onKeyDown={event => { if (event.key === "Enter") void load({ ...draft, page: 1 }); }} /></th>
+                  <th>
+                    <select aria-label="Type" value={draft.typeId} onChange={event => setDraft({ ...draft, typeId: event.target.value })}>
+                      <option value=""> </option>
+                      <option value="simple">Simple Product</option>
+                      <option value="configurable">Configurable Product</option>
+                      <option value="virtual">Virtual Product</option>
+                      <option value="bundle">Bundle Product</option>
+                      <option value="grouped">Grouped Product</option>
+                    </select>
+                  </th>
+                  <th><input aria-label="Attribute set" value={draft.attributeSetId} onChange={event => setDraft({ ...draft, attributeSetId: event.target.value })} onKeyDown={event => { if (event.key === "Enter") void load({ ...draft, page: 1 }); }} /></th>
+                  <th><input aria-label="SKU filter" value={draft.sku} onChange={event => setDraft({ ...draft, sku: event.target.value })} onKeyDown={event => { if (event.key === "Enter") void load({ ...draft, page: 1 }); }} /></th>
+                  <th><input aria-label="Product" value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} onKeyDown={event => { if (event.key === "Enter") void load({ ...draft, page: 1 }); }} /></th>
+                </tr>
+              </thead>
+              <tbody>
+                {!loading && page.items.length === 0 ? (
+                  <tr><td colSpan={6}>We couldn't find any records.</td></tr>
+                ) : null}
+                {page.items.map(product => (
+                  <tr key={product.sku}>
+                    <td><input type="checkbox" checked={picked.includes(product.sku)} aria-label={`Select ${product.sku}`} onChange={() => toggle(product.sku)} /></td>
+                    <td>{product.id}</td>
+                    <td>{typeLabel(product.typeId)}</td>
+                    <td>{product.attributeSetId}</td>
+                    <td>{product.sku}</td>
+                    <td>{product.name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type CategoryNode = CategoryChoice & { children: CategoryNode[] };
+
+function categoryOwnName(category: CategoryChoice): string {
+  if (category.name && !category.name.includes(" / ")) return category.name;
+  const parts = category.label.split(" / ").map(part => part.trim()).filter(Boolean);
+  return parts[parts.length - 1] || category.label;
+}
+
+function categoryNodes(categories: CategoryChoice[]): CategoryNode[] {
+  const linked = categories.some(category => category.parentId && categories.some(item => item.id === category.parentId));
+  if (linked) {
+    const nodes = new Map<string, CategoryNode>();
+    for (const category of categories) nodes.set(category.id, { ...category, name: categoryOwnName(category), children: [] });
+    const roots: CategoryNode[] = [];
+    for (const node of nodes.values()) {
+      const parent = node.parentId ? nodes.get(node.parentId) : undefined;
+      if (parent && parent.id !== node.id) parent.children.push(node);
+      else roots.push(node);
+    }
+    return roots;
   }
 
-  const lastPage = Math.max(1, Math.ceil(page.total / page.pageSize) || 1);
+  const byPath = new Map<string, CategoryNode>();
+  const roots: CategoryNode[] = [];
+  const ordered = [...categories].sort((left, right) => left.label.split(" / ").length - right.label.split(" / ").length);
+  for (const category of ordered) {
+    const parts = category.label.split(" / ").map(part => part.trim()).filter(Boolean);
+    const node: CategoryNode = { ...category, name: parts[parts.length - 1] || category.label, children: [] };
+    byPath.set(parts.join(" / "), node);
+    let parent: CategoryNode | undefined;
+    for (let size = parts.length - 1; size >= 1; size -= 1) {
+      parent = byPath.get(parts.slice(0, size).join(" / "));
+      if (parent) break;
+    }
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+  }
+  return roots;
+}
+
+function CategoryTreeNode({
+  node,
+  picked,
+  onToggle,
+  depth,
+}: {
+  node: CategoryNode;
+  picked: string[];
+  onToggle: (id: string) => void;
+  depth: number;
+}) {
+  const [open, setOpen] = useState(depth < 1);
+  const count = node.productCount != null ? node.productCount : node.id;
   return (
-    <div className="chooser-backdrop" role="dialog" aria-label="Choose products">
-      <div className="chooser">
-        {loading ? <CommerceLoader cover="local" /> : null}
-        <header>
-          <strong>{page.total} records found</strong>
-          <div className="chooser-actions">
-            <button type="button" onClick={() => { const next = emptyCatalogQuery(); setDraft(next); void load(next); }}>Reset Filter</button>
-            <button type="button" className="primary" onClick={() => { onChange(picked); setOpen(false); }}>Use selected</button>
-            <button type="button" onClick={() => setOpen(false)}>Close</button>
-          </div>
-        </header>
-        <p>{`${page.pageSize} per page · page ${page.page} of ${lastPage}`}</p>
-        {error && <p className="message" role="status">{error}</p>}
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th>ID</th>
-              <th>Type</th>
-              <th>Attribute Set</th>
-              <th>SKU</th>
-              <th>Product</th>
-            </tr>
-            <tr>
-              <th></th>
-              <th><input value={draft.entityId} onChange={event => setDraft({ ...draft, entityId: event.target.value })} onKeyDown={event => event.key === "Enter" && void load({ ...draft, page: 1 })} /></th>
-              <th>
-                <select value={draft.typeId} onChange={event => { const next = { ...draft, typeId: event.target.value, page: 1 }; setDraft(next); void load(next); }}>
-                  <option value="">Any</option>
-                  <option value="simple">Simple Product</option>
-                  <option value="configurable">Configurable Product</option>
-                  <option value="virtual">Virtual Product</option>
-                  <option value="bundle">Bundle Product</option>
-                  <option value="grouped">Grouped Product</option>
-                </select>
-              </th>
-              <th><input value={draft.attributeSetId} onChange={event => setDraft({ ...draft, attributeSetId: event.target.value })} onKeyDown={event => event.key === "Enter" && void load({ ...draft, page: 1 })} /></th>
-              <th><input value={draft.sku} onChange={event => setDraft({ ...draft, sku: event.target.value })} onKeyDown={event => event.key === "Enter" && void load({ ...draft, page: 1 })} /></th>
-              <th><input value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} onKeyDown={event => event.key === "Enter" && void load({ ...draft, page: 1 })} /></th>
-            </tr>
-          </thead>
-          <tbody>
-            {page.items.map(product => (
-              <tr key={product.sku}>
-                <td><input type="checkbox" checked={picked.includes(product.sku)} onChange={() => toggle(product.sku)} /></td>
-                <td>{product.id}</td>
-                <td>{product.typeId}</td>
-                <td>{product.attributeSetId}</td>
-                <td>{product.sku}</td>
-                <td>{product.name}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <footer>
-          <button type="button" disabled={query.page <= 1 || loading} onClick={() => void load({ ...query, page: query.page - 1 })}>Previous</button>
-          <button type="button" disabled={query.page >= lastPage || loading} onClick={() => void load({ ...query, page: query.page + 1 })}>Next</button>
-        </footer>
+    <li>
+      <div className="category-node">
+        {node.children.length ? (
+          <button type="button" className="category-toggle" aria-expanded={open} onClick={() => setOpen(current => !current)}>{open ? "▾" : "▸"}</button>
+        ) : <span className="category-toggle" />}
+        <input type="checkbox" checked={picked.includes(node.id)} aria-label={node.name || node.label} onChange={() => onToggle(node.id)} />
+        <span className="category-folder" aria-hidden="true" />
+        <span>{node.name || node.label} ({count})</span>
       </div>
+      {open && node.children.length ? (
+        <ul>
+          {node.children.map(child => (
+            <CategoryTreeNode key={child.id} node={child} picked={picked} onToggle={onToggle} depth={depth + 1} />
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
+
+function CategoryChooser({
+  categories,
+  selected,
+  onChange,
+}: {
+  categories: CategoryChoice[];
+  selected: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(selected.length > 0);
+  const [picked, setPicked] = useState<string[]>(selected);
+  const tree = categoryNodes(categories);
+  const summary = selected.map(id => categories.find(category => category.id === id)?.name || id).join(", ");
+
+  function toggle(id: string) {
+    setPicked(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  }
+
+  if (!editing) {
+    return <button type="button" className="rule-placeholder" onClick={() => setEditing(true)}>...</button>;
+  }
+
+  return (
+    <div className="sku-condition">
+      <div className="rule-value">
+        <input value={summary} aria-label="Categories" readOnly />
+        <button type="button" className="chooser-open" aria-label="Choose categories" aria-expanded={open} onClick={() => {
+          if (open) setOpen(false);
+          else {
+            setPicked(selected);
+            setOpen(true);
+          }
+        }}>▦</button>
+        <button type="button" className="rule-confirm" aria-label="Apply" onClick={() => { onChange(picked); setOpen(false); }}>✓</button>
+      </div>
+      {open ? (
+        <div className="category-tree" role="tree" aria-label="Categories">
+          <ul>
+            {tree.map(node => (
+              <CategoryTreeNode key={node.id} node={node} picked={picked} onToggle={toggle} depth={0} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -322,7 +599,6 @@ function ValueControl({
   browseCatalog: (query: CatalogQuery) => Promise<CatalogPage>;
 }) {
   const multiple = condition.operator === "in" || condition.operator === "nin" || attribute.input === "multiselect";
-  const [search, setSearch] = useState("");
 
   if (attribute.input === "date") {
     return <input type="date" value={String(condition.value || "").slice(0, 10)} onChange={event => onChange(event.target.value)} />;
@@ -348,49 +624,10 @@ function ValueControl({
     );
   }
   if (attribute.input === "category") {
-    const selected = valuesOf(condition.value);
-    const available = categories.filter(category => {
-      if (selected.includes(category.id)) return false;
-      if (!search.trim()) return true;
-      return `${category.label} ${category.id}`.toLowerCase().includes(search.trim().toLowerCase());
-    });
-    return (
-      <div className="choice-editor">
-        <div className="chips">
-          {selected.map(id => {
-            const category = categories.find(item => item.id === id);
-            return (
-              <button key={id} type="button" onClick={() => onChange(selected.filter(item => item !== id))}>
-                {category ? `${category.label} (${id})` : id} ×
-              </button>
-            );
-          })}
-        </div>
-        <input value={search} placeholder="Search categories" onChange={event => setSearch(event.target.value)} />
-        <select value="" onChange={event => { if (event.target.value) onChange([...new Set([...selected, event.target.value])]); }}>
-          <option value="">Select a category</option>
-          {available.map(category => (
-            <option key={category.id} value={category.id}>{category.label} ({category.id})</option>
-          ))}
-        </select>
-      </div>
-    );
+    return <CategoryChooser categories={categories} selected={valuesOf(condition.value)} onChange={onChange} />;
   }
   if (attribute.input === "sku") {
-    const selected = valuesOf(condition.value);
-    return (
-      <div className="choice-editor">
-        <div className="chooser-field">
-          <input value={selected.join(",")} placeholder="SKU" onChange={event => onChange(valuesOf(event.target.value))} />
-          <ProductChooser selected={selected} onChange={onChange} browseCatalog={browseCatalog} />
-        </div>
-        <div className="chips">
-          {selected.map(sku => (
-            <button key={sku} type="button" onClick={() => onChange(selected.filter(item => item !== sku))}>{sku} ×</button>
-          ))}
-        </div>
-      </div>
-    );
+    return <ProductChooser selected={valuesOf(condition.value)} onChange={onChange} browseCatalog={browseCatalog} />;
   }
   return <input value={Array.isArray(condition.value) ? condition.value.join(", ") : String(condition.value ?? "")} onChange={event => onChange(event.target.value)} />;
 }
@@ -436,6 +673,7 @@ function ConditionGroupEditor({
           <option value="true">TRUE</option>
           <option value="false">FALSE</option>
         </select>
+        <span>:</span>
         {onRemove && <button className="minus" type="button" aria-label="Remove combination" onClick={onRemove}>−</button>}
       </p>
       {group.conditions.map((node, index) => {
@@ -456,37 +694,39 @@ function ConditionGroupEditor({
         const attribute = attributes.find(item => item.code === node.attribute);
         const operators = operatorsFor(attribute?.input || "text");
         return (
-          <div className="condition-row" key={`condition-${index}-${node.attribute}`}>
-            <AttributeChoices
-              attributes={attributes}
-              value={node.attribute}
-              allowCombination={depth < MAX_GROUP_DEPTH}
-              onChange={code => {
-                if (code === COMBINATION) {
-                  updateChild(index, emptyGroup());
-                  return;
-                }
-                const nextAttribute = attributes.find(item => item.code === code);
-                updateChild(index, { attribute: code, operator: operatorsFor(nextAttribute?.input || "text")[0][0], value: "" });
-              }}
-            />
-            {attribute && (
-              <>
-                <select value={node.operator} onChange={event => updateChild(index, { ...node, operator: event.target.value })}>
-                  {operators.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-                <div className="condition-value">
-                  <ValueControl
-                    attribute={attribute}
-                    condition={node}
-                    categories={categories}
-                    onChange={value => updateChild(index, { ...node, value })}
-                    browseCatalog={browseCatalog}
-                  />
-                </div>
-              </>
-            )}
-            <button className="minus" type="button" aria-label="Remove condition" onClick={() => removeChild(index)}>−</button>
+          <div className="condition-entry" key={`condition-${index}-${node.attribute}`}>
+            <div className="condition-row">
+              <AttributeChoices
+                attributes={attributes}
+                value={node.attribute}
+                allowCombination={depth < MAX_GROUP_DEPTH}
+                onChange={code => {
+                  if (code === COMBINATION) {
+                    updateChild(index, emptyGroup());
+                    return;
+                  }
+                  const nextAttribute = attributes.find(item => item.code === code);
+                  updateChild(index, { attribute: code, operator: operatorsFor(nextAttribute?.input || "text")[0][0], value: "" });
+                }}
+              />
+              {attribute && (
+                <>
+                  <select value={node.operator} onChange={event => updateChild(index, { ...node, operator: event.target.value })}>
+                    {operators.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                  <div className="condition-value">
+                    <ValueControl
+                      attribute={attribute}
+                      condition={node}
+                      categories={categories}
+                      onChange={value => updateChild(index, { ...node, value })}
+                      browseCatalog={browseCatalog}
+                    />
+                  </div>
+                </>
+              )}
+              {node.attribute ? <button className="minus" type="button" aria-label="Remove condition" onClick={() => removeChild(index)}>×</button> : null}
+            </div>
           </div>
         );
       })}
@@ -512,12 +752,19 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
   const [categories, setCategories] = useState<CategoryChoice[]>([]);
   const [loadingPresets, setLoadingPresets] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [flushingCache, setFlushingCache] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [matched, setMatched] = useState<ProductChoice[]>([]);
   const [message, setMessage] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState(defaultBlockColumns);
+  const [columnSnapshot, setColumnSnapshot] = useState(defaultBlockColumns);
+  const [filterDraft, setFilterDraft] = useState<BlockListFilters>(emptyBlockFilters());
+  const [appliedFilters, setAppliedFilters] = useState<BlockListFilters>(emptyBlockFilters());
   const [page, setPage] = useState(1);
+  const [openActionId, setOpenActionId] = useState<string | null>(null);
+  const [baseline, setBaseline] = useState<EditorBaseline>(emptyBaseline);
   const [editSection, setEditSection] = useState<BlockEditSection>("frontend-properties");
 
   async function invoke(name: string, params: Record<string, unknown>) {
@@ -549,18 +796,6 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
     }
   }
 
-  async function flushStorefrontCache() {
-    setFlushingCache(true);
-    try {
-      await invoke("block-cache-flush", {});
-      setMessage("Storefront caches cleared (condition SKU results and PDP evaluation).");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to flush storefront cache.");
-    } finally {
-      setFlushingCache(false);
-    }
-  }
-
   function resetEditor() {
     setPresetId(undefined);
     setName("");
@@ -577,23 +812,38 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
     setBlockTypeId(typeId);
     setName(preset.name);
     setEnabled(preset.enabled !== false);
-    if (typeId === BLOCK_TYPE_BRANDS_LIST) {
-      setBrandsLogic(parseBrandsListLogic(preset.logic));
-      setRule(emptyRule());
-    } else {
-      const featuredLogic = preset.logic as Rule;
-      setRule({
-        aggregator: featuredLogic.aggregator,
-        matchValue: featuredLogic.matchValue !== false,
-        productsToDisplay: displayCount(featuredLogic.productsToDisplay),
-        conditions: featuredLogic.conditions || [],
-      });
-      setBrandsLogic(emptyBrandsListLogic());
-    }
+    const nextRule = typeId === BLOCK_TYPE_BRANDS_LIST
+      ? emptyRule()
+      : {
+        aggregator: (preset.logic as Rule).aggregator,
+        matchValue: (preset.logic as Rule).matchValue !== false,
+        productsToDisplay: displayCount((preset.logic as Rule).productsToDisplay),
+        conditions: (preset.logic as Rule).conditions || [],
+      };
+    const nextBrands = typeId === BLOCK_TYPE_BRANDS_LIST
+      ? parseBrandsListLogic(preset.logic)
+      : emptyBrandsListLogic();
+    setRule(nextRule);
+    setBrandsLogic(nextBrands);
     setMatched([]);
     setMessage("");
-    setEditSection("block-options");
+    setEditSection("frontend-properties");
+    setBaseline(cloneDraft({
+      name: preset.name,
+      enabled: preset.enabled !== false,
+      rule: nextRule,
+      brandsLogic: nextBrands,
+    }));
     setView({ screen: "edit", blockTypeId: typeId, presetId: presetLookupId(preset) });
+  }
+
+  function resetToBaseline() {
+    setName(baseline.name);
+    setEnabled(baseline.enabled);
+    setRule(cloneDraft(baseline.rule));
+    setBrandsLogic(cloneDraft(baseline.brandsLogic));
+    setMatched([]);
+    setMessage("");
   }
 
   function buildLogicPayload() {
@@ -624,7 +874,14 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
       setName(payload.preset.name);
       await loadPresets();
       setMessage(`Saved ${payload.preset.name}.`);
-      if (!options?.stayOnForm) {
+      if (options?.stayOnForm) {
+        setBaseline(cloneDraft({
+          name: payload.preset.name,
+          enabled,
+          rule,
+          brandsLogic,
+        }));
+      } else {
         setView({ screen: "list" });
         resetEditor();
       }
@@ -650,28 +907,47 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
     }
   }
 
-  async function toggleEnabled(preset: SavedCondition) {
+  async function duplicateBlock(preset: SavedCondition) {
     try {
       await invoke("block-condition-write", {
         preset: {
-          id: presetLookupId(preset),
-          name: preset.name,
-          enabled: preset.enabled === false,
+          name: uniqueCopyName(preset.name, presets),
+          enabled: preset.enabled !== false,
           blockType: preset.blockType || BLOCK_TYPE_FEATURED_RECOMMENDED,
           logic: preset.logic,
         },
       });
       await loadPresets();
+      setMessage(`Duplicated ${preset.name}.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to update block status.");
+      setMessage(error instanceof Error ? error.message : "Unable to duplicate this block.");
     }
   }
 
   function runRowAction(preset: SavedCondition, action: string) {
+    setOpenActionId(null);
     if (action === "edit") openPresetForEdit(preset);
+    if (action === "duplicate") void duplicateBlock(preset);
     if (action === "delete") void deleteBlock(presetLookupId(preset));
-    if (action === "toggle") void toggleEnabled(preset);
   }
+
+  useEffect(() => {
+    if (!openActionId) return;
+    function close(event: MouseEvent) {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".admin-action")) return;
+      setOpenActionId(null);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpenActionId(null);
+    }
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openActionId]);
 
   useEffect(() => {
     void loadPresets();
@@ -706,11 +982,10 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
     }
   }
 
-  const filteredPresets = presets.filter(preset => {
-    if (!searchKeyword.trim()) return true;
-    const haystack = `${preset.name} ${displayBlockId(preset)}`.toLowerCase();
-    return haystack.includes(searchKeyword.trim().toLowerCase());
-  });
+  const filteredPresets = presets.filter(preset => presetMatchesFilters(preset, searchKeyword, appliedFilters));
+  const activeFilters = appliedFilterLabels(searchKeyword, appliedFilters);
+  const shownColumns = blockColumns.filter(column => visibleColumns[column.id]);
+  const visibleColumnCount = shownColumns.length;
   const totalPages = Math.max(1, Math.ceil(filteredPresets.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pagePresets = filteredPresets.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -748,11 +1023,14 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
             onClick={() => {
               resetEditor();
               setBlockTypeId(blockTypeId);
+              const nextRule = emptyRule();
+              const nextBrands = emptyBrandsListLogic();
               if (blockTypeId === BLOCK_TYPE_BRANDS_LIST) {
-                setBrandsLogic(emptyBrandsListLogic());
+                setBrandsLogic(nextBrands);
               } else {
-                setRule(emptyRule());
+                setRule(nextRule);
               }
+              setBaseline(cloneDraft({ name: "", enabled: true, rule: nextRule, brandsLogic: nextBrands }));
               setEditSection("frontend-properties");
               setView({ screen: "edit", blockTypeId });
             }}
@@ -766,44 +1044,55 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
 
   if (view.screen === "edit") {
     return (
-      <main className="conditional-blocks">
+      <main className="conditional-blocks block-edit-page">
         {(saving || fetching) ? <CommerceLoader /> : null}
-        {message && <p className="message" role="status">{message}</p>}
         <SectionLayout
           heading={presetId ? "Edit Block" : "New Block"}
+          navTitle="Widget information"
           sections={[...blockEditSections]}
           activeSectionId={editSection}
           onSectionChange={id => setEditSection(id as BlockEditSection)}
           headerActions={
-            <button type="button" className="link-button" onClick={() => { resetEditor(); setView({ screen: "list" }); }}>
-              ← Back to list
-            </button>
+            <div className="block-edit-actions">
+              <button type="button" onClick={() => { resetEditor(); setView({ screen: "list" }); }}>← Back</button>
+              {presetId ? (
+                <button type="button" onClick={() => void deleteBlock(presetId)} disabled={saving}>Delete Block</button>
+              ) : null}
+              <button type="button" onClick={resetToBaseline} disabled={saving}>Reset</button>
+              <button type="button" onClick={() => void saveBlock({ stayOnForm: true })} disabled={saving}>Save and Continue Edit</button>
+              <button type="button" className="admin-primary" onClick={() => void saveBlock()} disabled={saving}>
+                {saving ? "Saving…" : "Save Block"}
+              </button>
+            </div>
           }
         >
+          {message ? <p className="message" role="status">{message}</p> : null}
           {editSection === "frontend-properties" && (
             <>
+              <h2 className="block-edit-section-title">Frontend Properties</h2>
               <div className="field-row">
-                <span id="block-type-edit-label">Type</span>
-                <p className="field-readonly" id="block-type-edit" aria-labelledby="block-type-edit-label">
-                  {blockType?.label ?? blockTypeId}
-                </p>
+                <label htmlFor="block-type-edit">Type</label>
+                <select id="block-type-edit" value={blockTypeId} disabled>
+                  <option value={blockTypeId}>{blockType?.label ?? blockTypeId}</option>
+                </select>
               </div>
               <div className="field-row">
                 <label htmlFor="block-title">Title<span className="required">*</span></label>
                 <input id="block-title" value={name} onChange={event => setName(event.target.value)} />
               </div>
               <div className="field-row">
-                <label htmlFor="block-enabled">Enabled</label>
-                <select id="block-enabled" value={enabled ? "1" : "0"} onChange={event => setEnabled(event.target.value === "1")}>
-                  <option value="1">Enabled</option>
-                  <option value="0">Disabled</option>
-                </select>
+                <label htmlFor="block-enabled">Enable Block</label>
+                <span className="admin-toggle">
+                  <input id="block-enabled" type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)} />
+                  <span>{enabled ? "Yes" : "No"}</span>
+                </span>
               </div>
             </>
           )}
 
           {editSection === "block-options" && (
             <>
+              <h2 className="block-edit-section-title">Widget Options</h2>
               {blockTypeId === BLOCK_TYPE_BRANDS_LIST && (
                 <BrandsListForm logic={brandsLogic} onChange={setBrandsLogic} />
               )}
@@ -821,10 +1110,8 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
                       onChange={event => setRule({ ...rule, productsToDisplay: displayCount(event.target.value) })}
                     />
                   </div>
-                  <div className="conditions-field">
-                    <div className="field-row conditions-label">
-                      <span>Conditions<span className="required">*</span></span>
-                    </div>
+                  <div className="field-row conditions-label">
+                    <span>Conditions<span className="required">*</span></span>
                     <ConditionGroupEditor
                       group={rule}
                       depth={1}
@@ -851,107 +1138,287 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
             </>
           )}
 
-          <footer className="form-actions">
-            <button type="button" className="btn-continue" onClick={() => void saveBlock()} disabled={saving}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-            <button type="button" onClick={() => { resetEditor(); setView({ screen: "list" }); }}>Cancel</button>
-          </footer>
         </SectionLayout>
       </main>
     );
   }
 
   return (
-    <main className="conditional-blocks">
-      {(loadingPresets || flushingCache) ? <CommerceLoader /> : null}
-      <header className="page-header list-header">
-        <h1>Blocks</h1>
-        <div className="list-header-actions">
-          <button
-            type="button"
-            onClick={() => void flushStorefrontCache()}
-            disabled={flushingCache}
-          >
-            {flushingCache ? "Flushing…" : "Flush storefront cache"}
-          </button>
-          <button
-            type="button"
-            className="btn-continue"
-            onClick={() => {
-              resetEditor();
-              setBlockTypeId(BLOCK_TYPE_FEATURED_RECOMMENDED);
-              setView({ screen: "type-select" });
-            }}
-          >
-            Add New Block
-          </button>
-        </div>
+    <main className="conditional-blocks admin-list">
+      {loadingPresets ? <CommerceLoader /> : null}
+      <header className="admin-list-header">
+        <h1>Blocks Management</h1>
       </header>
+      <div className="admin-list-band">
+        <button
+          type="button"
+          className="admin-primary"
+          onClick={() => {
+            resetEditor();
+            setBlockTypeId(BLOCK_TYPE_FEATURED_RECOMMENDED);
+            setView({ screen: "type-select" });
+          }}
+        >
+          Add New Block
+        </button>
+      </div>
+      <div className="admin-list-body">
       {message && <p className="message" role="status">{message}</p>}
 
-      <div className="list-toolbar">
-        <label className="search-field">
-          <span className="sr-only">Search by keyword</span>
-          <input
-            placeholder="Search by keyword"
-            value={searchKeyword}
-            onChange={event => { setSearchKeyword(event.target.value); setPage(1); }}
-          />
-        </label>
-        <span className="record-count">{filteredPresets.length} records found</span>
-        <div className="pagination">
-          <select value={PAGE_SIZE} disabled>
-            <option value={PAGE_SIZE}>{PAGE_SIZE}</option>
-          </select>
-          <span>{currentPage} of {totalPages}</span>
-          <button type="button" disabled={currentPage <= 1} onClick={() => setPage(current => current - 1)} aria-label="Previous page">‹</button>
-          <button type="button" disabled={currentPage >= totalPages} onClick={() => setPage(current => current + 1)} aria-label="Next page">›</button>
+      <section className="admin-grid-card">
+        {activeFilters.length > 0 ? (
+          <div className="admin-active-filters">
+            <span>Active filters:</span>
+            {activeFilters.map(label => (
+              <span key={label} className="admin-filter-chip">{label}</span>
+            ))}
+            <button
+              type="button"
+              className="admin-clear"
+              onClick={() => {
+                setSearchKeyword("");
+                setAppliedFilters(emptyBlockFilters());
+                setFilterDraft(emptyBlockFilters());
+                setPage(1);
+              }}
+            >
+              Clear all
+            </button>
+          </div>
+        ) : null}
+        <div className="admin-search-row">
+          <form className="admin-keyword" onSubmit={event => event.preventDefault()}>
+            <label className="sr-only" htmlFor="block-keyword">Search by keyword</label>
+            <input
+              id="block-keyword"
+              placeholder="Search by keyword"
+              value={searchKeyword}
+              onChange={event => { setSearchKeyword(event.target.value); setPage(1); }}
+            />
+            <button type="submit" className="admin-keyword-submit">Search</button>
+          </form>
+          <div className="admin-grid-tools">
+            <button
+              type="button"
+              className={filtersOpen ? "admin-filters-toggle open" : "admin-filters-toggle"}
+              aria-expanded={filtersOpen}
+              onClick={() => {
+                setFilterDraft(appliedFilters);
+                setFiltersOpen(open => !open);
+              }}
+            >
+              Filters
+            </button>
+            <div className="admin-columns">
+              <button
+                type="button"
+                className={columnsOpen ? "admin-columns-toggle open" : "admin-columns-toggle"}
+                aria-expanded={columnsOpen}
+                onClick={() => {
+                  setColumnsOpen(open => {
+                    if (!open) setColumnSnapshot(visibleColumns);
+                    return !open;
+                  });
+                }}
+              >
+                Columns
+              </button>
+              {columnsOpen ? (
+                <div className="admin-columns-menu" role="dialog" aria-label="Columns">
+                  <p className="admin-columns-count">{visibleColumnCount} out of {blockColumns.length} visible</p>
+                  <div className="admin-columns-list">
+                    {blockColumns.map(column => (
+                      <label key={column.id}>
+                        <input
+                          type="checkbox"
+                          checked={visibleColumns[column.id]}
+                          onChange={() => setVisibleColumns(current => ({ ...current, [column.id]: !current[column.id] }))}
+                        />
+                        {column.label}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="admin-columns-actions">
+                    <button type="button" className="admin-clear" onClick={() => setVisibleColumns(defaultBlockColumns())}>Reset</button>
+                    <button
+                      type="button"
+                      className="admin-clear"
+                      onClick={() => {
+                        setVisibleColumns(columnSnapshot);
+                        setColumnsOpen(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
-      </div>
+        {filtersOpen ? (
+          <form
+            className="admin-filter-panel"
+            onSubmit={event => {
+              event.preventDefault();
+              setAppliedFilters(filterDraft);
+              setPage(1);
+            }}
+          >
+            <div className="admin-filter-col">
+              <span className="admin-filter-name">Block ID</span>
+              <label>
+                from
+                <input
+                  inputMode="numeric"
+                  value={filterDraft.blockIdFrom}
+                  onChange={event => setFilterDraft(current => ({ ...current, blockIdFrom: event.target.value }))}
+                />
+              </label>
+              <label>
+                to
+                <input
+                  inputMode="numeric"
+                  value={filterDraft.blockIdTo}
+                  onChange={event => setFilterDraft(current => ({ ...current, blockIdTo: event.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="admin-filter-col">
+              <span className="admin-filter-name">Created At</span>
+              <label>
+                from
+                <input
+                  type="date"
+                  value={filterDraft.createdFrom}
+                  onChange={event => setFilterDraft(current => ({ ...current, createdFrom: event.target.value }))}
+                />
+              </label>
+              <label>
+                to
+                <input
+                  type="date"
+                  value={filterDraft.createdTo}
+                  onChange={event => setFilterDraft(current => ({ ...current, createdTo: event.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="admin-filter-col admin-filter-title">
+              <span className="admin-filter-name">Title</span>
+              <label>
+                <span className="sr-only">Title</span>
+                <input
+                  value={filterDraft.title}
+                  onChange={event => setFilterDraft(current => ({ ...current, title: event.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="admin-filter-col">
+              <span className="admin-filter-name">Enabled</span>
+              <label>
+                <span className="sr-only">Enabled</span>
+                <select
+                  value={filterDraft.enabled}
+                  onChange={event => setFilterDraft(current => ({ ...current, enabled: event.target.value as BlockListFilters["enabled"] }))}
+                >
+                  <option value=""> </option>
+                  <option value="1">Enabled</option>
+                  <option value="0">Disabled</option>
+                </select>
+              </label>
+            </div>
+            <div className="admin-filter-actions">
+              <button
+                type="button"
+                className="admin-clear"
+                onClick={() => {
+                  setFilterDraft(appliedFilters);
+                  setFiltersOpen(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="admin-apply-filters">Apply Filters</button>
+            </div>
+          </form>
+        ) : null}
+        <div className="admin-grid-toolbar">
+          <span className="admin-record-count">{filteredPresets.length} records found</span>
+          <div className="admin-pager">
+            <label>
+              <select value={PAGE_SIZE} disabled aria-label="Records per page">
+                <option value={PAGE_SIZE}>{PAGE_SIZE}</option>
+              </select>
+              <span>per page</span>
+            </label>
+            <button type="button" disabled={currentPage <= 1} onClick={() => setPage(current => current - 1)} aria-label="Previous page">‹</button>
+            <input
+              key={currentPage}
+              aria-label="Current page"
+              defaultValue={currentPage}
+              onBlur={event => {
+                const next = Number(event.target.value);
+                if (Number.isInteger(next) && next >= 1 && next <= totalPages) setPage(next);
+              }}
+              onKeyDown={event => {
+                if (event.key !== "Enter") return;
+                const next = Number((event.target as HTMLInputElement).value);
+                if (Number.isInteger(next) && next >= 1 && next <= totalPages) setPage(next);
+              }}
+            />
+            <span>of {totalPages}</span>
+            <button type="button" disabled={currentPage >= totalPages} onClick={() => setPage(current => current + 1)} aria-label="Next page">›</button>
+          </div>
+        </div>
 
-      <div className="table-wrap">
-        <table className="blocks-grid">
+      <div className="admin-grid-wrap">
+        <table className="admin-grid">
           <thead>
             <tr>
-              <th>Block ID</th>
-              <th>Title</th>
-              <th>Created At</th>
-              <th>Enabled</th>
-              <th>Action</th>
+              {shownColumns.map(column => <th key={column.id}>{column.label}</th>)}
             </tr>
           </thead>
           <tbody>
             {!loadingPresets && pagePresets.length === 0 && (
-              <tr><td colSpan={5}>No blocks found.</td></tr>
+              <tr><td colSpan={Math.max(visibleColumnCount, 1)}>We couldn't find any records.</td></tr>
             )}
             {!loadingPresets && pagePresets.map(preset => (
               <tr key={presetLookupId(preset)}>
-                <td>{displayBlockId(preset)}</td>
-                <td><button type="button" className="link-button" onClick={() => openPresetForEdit(preset)}>{preset.name}</button></td>
-                <td>{formatCreatedAt(preset.createdAt || preset.updatedAt)}</td>
-                <td>{preset.enabled === false ? "Disabled" : "Enabled"}</td>
-                <td>
-                  <select
-                    defaultValue="select"
-                    onChange={event => {
-                      const action = event.target.value;
-                      if (action !== "select") {
-                        runRowAction(preset, action);
-                        event.target.value = "select";
-                      }
-                    }}
-                  >
-                    <option value="select">Select</option>
-                    <option value="edit">Edit</option>
-                    <option value="toggle">{preset.enabled === false ? "Enable" : "Disable"}</option>
-                    <option value="delete">Delete</option>
-                  </select>
-                </td>
+                {visibleColumns.blockId ? <td>{displayBlockId(preset)}</td> : null}
+                {visibleColumns.title ? <td><button type="button" className="admin-row-link" onClick={() => openPresetForEdit(preset)}>{preset.name}</button></td> : null}
+                {visibleColumns.createdAt ? <td>{formatCreatedAt(preset.createdAt || preset.updatedAt)}</td> : null}
+                {visibleColumns.enabled ? <td>{preset.enabled === false ? "Disabled" : "Enabled"}</td> : null}
+                {visibleColumns.action ? (
+                  <td>
+                    <div className="admin-action">
+                      <button
+                        type="button"
+                        className={openActionId === presetLookupId(preset) ? "admin-action-toggle open" : "admin-action-toggle"}
+                        aria-expanded={openActionId === presetLookupId(preset)}
+                        aria-haspopup="menu"
+                        onClick={() => {
+                          const id = presetLookupId(preset);
+                          setOpenActionId(current => current === id ? null : id);
+                        }}
+                      >
+                        Select
+                      </button>
+                      {openActionId === presetLookupId(preset) ? (
+                        <div className="admin-action-menu" role="menu">
+                          <button type="button" role="menuitem" onClick={() => runRowAction(preset, "edit")}>Edit</button>
+                          <button type="button" role="menuitem" onClick={() => runRowAction(preset, "duplicate")}>Duplicate</button>
+                          <button type="button" role="menuitem" onClick={() => runRowAction(preset, "delete")}>Delete</button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+      </section>
       </div>
     </main>
   );

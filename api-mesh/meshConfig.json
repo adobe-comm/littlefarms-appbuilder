@@ -18,8 +18,19 @@
               "x-lf-storefront-url": "{context.secrets.LITTLEFARMS_BLOCK_STOREFRONT_URL}",
               "x-lf-evaluate-url": "{context.secrets.LITTLEFARMS_BLOCK_EVALUATE_URL}",
               "x-lf-brand-url": "{context.secrets.LITTLEFARMS_BRAND_STOREFRONT_URL}",
-              "x-lf-shared-secret": "{context.secrets.EVALUATE_SHARED_SECRET}"
+              "x-lf-shared-secret": "{context.secrets.EVALUATE_SHARED_SECRET}",
+              "x-lf-commerce-url": "{context.secrets.COMMERCE_CORE_GRAPHQL_URL}",
+              "x-lf-environment-id": "{context.secrets.MAGENTO_ENVIRONMENT_ID}",
+              "x-lf-store-view": "{context.secrets.MAGENTO_STORE_VIEW_CODE}",
+              "x-lf-store": "{context.secrets.MAGENTO_STORE_CODE}",
+              "x-lf-website": "{context.secrets.MAGENTO_WEBSITE_CODE}",
+              "x-lf-api-key": "{context.secrets.MAGENTO_API_KEY}"
             }
+          }
+        },
+        "responseConfig": {
+          "cache": {
+            "cacheControl": "public, max-age=60"
           }
         }
       }
@@ -38,6 +49,10 @@
         ],
         "maxAge": 86400,
         "credentials": false
+      },
+      "cache": true,
+      "headers": {
+        "Cache-Control": "public, max-age=60"
       }
     }
   }

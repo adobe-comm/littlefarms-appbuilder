@@ -94,7 +94,7 @@ const MATCH_PAGE_SIZE = 100
 const MATCH_PAGE_LIMIT = 5
 const CATEGORY_PAGE_SIZE = 200
 const CATEGORY_PAGE_LIMIT = 10
-const PRODUCT_CHOOSER_PAGE_SIZE = 50
+const PRODUCT_CHOOSER_PAGE_SIZE = 20
 
 function conditionValues (condition) {
   return Array.isArray(condition?.value)
@@ -253,7 +253,14 @@ function catalogCategoryChoices (categories = []) {
         .split('/')
         .map(id => byId.get(id)?.name)
         .filter(Boolean)
-      return { id: String(category.id), label: names.join(' / ') || category.name }
+      const productCount = Number(category.product_count)
+      return {
+        id: String(category.id),
+        parentId: category.parent_id == null ? '' : String(category.parent_id),
+        name: category.name || names[names.length - 1] || String(category.id),
+        productCount: Number.isFinite(productCount) ? productCount : null,
+        label: names.join(' / ') || category.name
+      }
     })
 }
 

@@ -22,7 +22,8 @@ async function main (params) {
       attributeCode,
       storeViewCode,
       page: params.page,
-      pageSize: params.pageSize
+      pageSize: params.pageSize,
+      search: params.search
     })
     logger.info(`Listed brands for ${attributeCode || 'no attribute'} page ${page.page}`)
     return {

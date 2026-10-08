@@ -51,7 +51,51 @@ aio app db index create littlefarms_brands \
   --name brand_list
 ```
 
-`brand_option_scope` keeps one row per option in a store view. `brand_list` is the index the brand directory query uses. Confirm with:
+`brand_option_scope` keeps one row per option in a store view. `brand_list` is the index the brand directory query uses.
+
+The storefront filters on `littleFarmsBrands` need one more index each. Create them once in the same namespace. `name` on that query is a contains match and stays on the rows these indexes already selected. Exact brand lookup by name uses `brand_name`.
+
+```bash
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"is_active":1,"optionLabel":1}' \
+  --name brand_active
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"is_new_brand":1,"optionLabel":1}' \
+  --name brand_new
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"is_top_brand":1,"optionLabel":1}' \
+  --name brand_top
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"is_featured":1,"optionLabel":1}' \
+  --name brand_featured
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"show_in_brand_list_widget":1,"optionLabel":1}' \
+  --name brand_list_widget
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"hidden":1,"optionRemoved":1,"show_in_brand_slider_widget":1,"optionLabel":1}' \
+  --name brand_slider_widget
+
+aio app db index create littlefarms_brands \
+  --spec '{"environmentId":1,"attributeCode":1,"storeViewCode":1,"normalizedLabel":1}' \
+  --name brand_name
+```
+
+| Index | GraphQL argument |
+|-------|------------------|
+| `brand_active` | `isActive`, and `littleFarmsBrandsList` |
+| `brand_new` | `isNewBrand` |
+| `brand_top` | `isTopBrand` |
+| `brand_featured` | `isFeatured` |
+| `brand_list_widget` | `showInBrandListWidget` and `widget: LIST` |
+| `brand_slider_widget` | `showInBrandSliderWidget` and `widget: SLIDER` |
+| `brand_name` | `littleFarmsBrand(name:)` |
+
+Confirm with:
 
 ```bash
 aio app db index list littlefarms_brands --json

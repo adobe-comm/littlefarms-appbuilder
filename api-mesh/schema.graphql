@@ -9,6 +9,47 @@ type LittleFarmsBrandsListPayload {
   items: [LittleFarmsBrandItem!]!
 }
 
+type LittleFarmsMoney {
+  value: Float
+  currency: String
+}
+
+type LittleFarmsProductPrice {
+  regular: LittleFarmsMoney
+  final: LittleFarmsMoney
+}
+
+type LittleFarmsProductPriceRange {
+  minimum: LittleFarmsProductPrice
+  maximum: LittleFarmsProductPrice
+}
+
+type LittleFarmsProductImage {
+  url: String
+  label: String
+  roles: [String!]
+}
+
+type LittleFarmsProductAttribute {
+  name: String
+  label: String
+  value: String
+  roles: [String!]
+}
+
+type LittleFarmsProduct {
+  sku: String!
+  name: String!
+  url: String
+  urlKey: String
+  inStock: Boolean
+  addToCartAllowed: Boolean
+  images: [LittleFarmsProductImage!]!
+  attributes: [LittleFarmsProductAttribute!]!
+  price: LittleFarmsProductPrice
+  priceRange: LittleFarmsProductPriceRange
+}
+
 type LittleFarmsFeaturedPayload {
   aggregator: String!
   matchValue: Boolean!
@@ -16,6 +57,8 @@ type LittleFarmsFeaturedPayload {
   conditionsJson: String!
   productSkus: [String!]!
   productSkusStatus: String
+  products: [LittleFarmsProduct!]!
+  productsStatus: String
 }
 
 type LittleFarmsPlacementPayload {
@@ -23,6 +66,8 @@ type LittleFarmsPlacementPayload {
   title: String
   contentHtml: String
   targetSkus: [String!]!
+  products: [LittleFarmsProduct!]!
+  productsStatus: String
 }
 
 type LittleFarmsBlock {
@@ -36,21 +81,48 @@ type LittleFarmsBlock {
   placement: LittleFarmsPlacementPayload
 }
 
+input LittleFarmsProductSearchRange {
+  from: Float
+  to: Float
+}
+
+input LittleFarmsProductSearchFilter {
+  attribute: String!
+  eq: String
+  in: [String!]
+  startsWith: String
+  contains: String
+  range: LittleFarmsProductSearchRange
+}
+
 extend type Query {
-  littleFarmsBlock(id: ID, title: String, blockId: Int): LittleFarmsBlock
+  littleFarmsBlock(id: ID, title: String, blockId: Int, filter: [LittleFarmsProductSearchFilter!]): LittleFarmsBlock
   littleFarmsBlocks(
     blockType: String
     sku: String
-    storeViewCode: String
   ): [LittleFarmsBlock!]!
-  littleFarmsBrand(id: ID, name: String, urlAlias: String, storeViewCode: String): LittleFarmsBrand
+  littleFarmsBrand(id: ID, name: String, urlAlias: String): LittleFarmsBrand
   littleFarmsBrands(
-    storeViewCode: String
     widget: LittleFarmsBrandWidget
+    name: String
+    isActive: Boolean
+    isNewBrand: Boolean
+    isTopBrand: Boolean
+    isFeatured: Boolean
+    showInBrandListWidget: Boolean
+    showInBrandSliderWidget: Boolean
     page: Int
     pageSize: Int
-  ): [LittleFarmsBrand!]!
-  littleFarmsBrandsList(storeViewCode: String): [LittleFarmsBrandSummary!]!
+  ): LittleFarmsBrandsPayload!
+  littleFarmsBrandsList: [LittleFarmsBrandSummary!]!
+}
+
+type LittleFarmsBrandsPayload {
+  page: Int!
+  pageSize: Int!
+  total: Int!
+  pageCount: Int!
+  items: [LittleFarmsBrand!]!
 }
 
 type LittleFarmsBrandSummary {

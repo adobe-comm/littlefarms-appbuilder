@@ -15,7 +15,7 @@ function widgetKey (storeViewCode, widget, page) {
 }
 
 function directoryKey (storeViewCode) {
-  return `brand.${encodePart(storeViewCode)}.directory`
+  return `brand.${encodePart(storeViewCode)}.directory.active`
 }
 
 const SETTINGS_KEY = 'brand.settings'

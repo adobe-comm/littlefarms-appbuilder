@@ -37,11 +37,7 @@ export function BrandsListForm({ logic, onChange }: BrandsListFormProps) {
   }
 
   return (
-    <section className="widget-options" aria-labelledby="brands-widget-options-heading">
-      <h3 id="brands-widget-options-heading" className="widget-options-heading">
-        Widget Options
-      </h3>
-
+    <section className="widget-options">
       <div className="field-row">
         <label htmlFor="brands-list-url">URL</label>
         <input

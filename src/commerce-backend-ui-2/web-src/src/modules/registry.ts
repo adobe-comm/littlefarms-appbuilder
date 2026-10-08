@@ -2,8 +2,6 @@
  * Top-level LittleFarms admin modules shown in the app module menu.
  * Register new modules here when adding features (do not use generic "Module" labels).
  */
-import logoBundled from "../assets/little-farms-logo.png";
-import { resolveAssetUrl } from "../lib/resolve-asset-url.ts";
 
 export type AppModuleDefinition = {
   id: string;
@@ -14,21 +12,6 @@ export type AppModuleDefinition = {
   /** When false, hidden until the feature is ready */
   available: boolean;
 };
-
-/** Logo served from the bundle or static `web-src/assets/` fallback. */
-export const littleFarmsLogo = (() => {
-  const fromImportMeta = (() => {
-    try {
-      return new URL("../assets/little-farms-logo.png", import.meta.url).href;
-    } catch {
-      return "";
-    }
-  })();
-  const fromBundler = resolveAssetUrl(logoBundled);
-  const staticFallback = "./assets/little-farms-logo.png";
-  const candidate = fromImportMeta || fromBundler || staticFallback;
-  return candidate.includes("[object Object]") ? staticFallback : candidate;
-})();
 
 export const appModules: AppModuleDefinition[] = [
   {

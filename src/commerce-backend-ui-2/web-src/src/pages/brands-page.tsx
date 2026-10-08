@@ -5,9 +5,7 @@ import { fileToBase64, invokeBrandAction } from "./brands-api.ts";
 import { BrandForm, brandSections } from "./brands-form.tsx";
 import {
   ALL_STORE_VIEWS,
-  DEFAULT_STORE_VIEW,
   plainText,
-  scopeLabel,
   type BrandListResponse,
   type BrandRecord,
   type DropdownAttribute,
@@ -34,19 +32,19 @@ export function BrandsPage({ ims }: { ims: Ims }) {
   const [attributes, setAttributes] = useState<DropdownAttribute[]>([]);
   const [savedCode, setSavedCode] = useState("");
   const [selectedCode, setSelectedCode] = useState("");
-  const [storeViewCode, setStoreViewCode] = useState(DEFAULT_STORE_VIEW);
+  const [searchDraft, setSearchDraft] = useState("");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [items, setItems] = useState<BrandRecord[]>([]);
   const [brand, setBrand] = useState<BrandRecord | null>(null);
-  const [editScope, setEditScope] = useState(ALL_STORE_VIEWS);
   const [section, setSection] = useState("general");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const loadList = useCallback(async (nextPage: number, view: string, attributeCode: string) => {
+  const loadList = useCallback(async (nextPage: number, attributeCode: string, query = "") => {
     setLoading(true);
     setMessage("");
     try {
@@ -54,7 +52,8 @@ export function BrandsPage({ ims }: { ims: Ims }) {
         attributeCode,
         page: nextPage,
         pageSize: PAGE_SIZE,
-        storeViewCode: view,
+        storeViewCode: ALL_STORE_VIEWS,
+        search: query,
       });
       setItems(result.items || []);
       setTotal(result.total || 0);
@@ -76,7 +75,7 @@ export function BrandsPage({ ims }: { ims: Ims }) {
         setAttributes(settings.attributes || []);
         setSavedCode(settings.brandAttributeCode || "");
         setSelectedCode(settings.brandAttributeCode || "");
-        if (settings.brandAttributeCode) await loadList(1, DEFAULT_STORE_VIEW, settings.brandAttributeCode);
+        if (settings.brandAttributeCode) await loadList(1, settings.brandAttributeCode);
         else setLoading(false);
       } catch (error) {
         if (!cancelled) {
@@ -114,8 +113,9 @@ export function BrandsPage({ ims }: { ims: Ims }) {
       });
       setSavedCode(selectedCode);
       setBrand(null);
-      await loadList(1, storeViewCode, selectedCode);
-      setMessage("Brand attribute saved.");
+      setSearch("");
+      setSearchDraft("");
+      await loadList(1, selectedCode, "");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save the brand attribute.");
     } finally {
@@ -123,21 +123,20 @@ export function BrandsPage({ ims }: { ims: Ims }) {
     }
   }
 
-  async function openBrand(optionValue: string, scope: string) {
+  async function openBrand(optionValue: string) {
     setMessage("");
     setLoading(true);
     try {
       const result = await invokeBrandAction<BrandGetResponse>(ims, "brand-list", {
         attributeCode: savedCode,
         optionValue,
-        storeViewCode: scope,
+        storeViewCode: ALL_STORE_VIEWS,
       });
       if (!result.brand) {
         setMessage("Unable to open the brand.");
         return;
       }
       setBrand(result.brand);
-      setEditScope(scope);
       setSection("general");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to open the brand.");
@@ -154,7 +153,7 @@ export function BrandsPage({ ims }: { ims: Ims }) {
       const result = await invokeBrandAction<BrandGetResponse>(ims, "brand-write", {
         attributeCode: brand.attributeCode,
         optionValue: brand.optionValue,
-        storeViewCode: editScope,
+        storeViewCode: ALL_STORE_VIEWS,
         fields: {
           is_active: brand.is_active,
           is_new_brand: brand.is_new_brand,
@@ -219,6 +218,18 @@ export function BrandsPage({ ims }: { ims: Ims }) {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const busy = loading || saving || uploading;
+  function clearSearch() {
+    setSearch("");
+    setSearchDraft("");
+    void loadList(1, savedCode, "");
+  }
+
+  function goToPage(raw: string) {
+    const next = Number(raw);
+    if (!Number.isInteger(next) || next < 1 || next > pageCount || next === page) return;
+    void loadList(next, savedCode, search);
+  }
+
 
   if (brand) {
     return (
@@ -230,17 +241,7 @@ export function BrandsPage({ ims }: { ims: Ims }) {
         onSectionChange={setSection}
         headerActions={(
           <div className="actions">
-            <label className="brand-inline">
-              Scope
-              <select
-                value={editScope}
-                onChange={event => void openBrand(brand.optionValue, event.target.value)}
-              >
-                <option value={ALL_STORE_VIEWS}>All Store Views</option>
-                <option value={DEFAULT_STORE_VIEW}>Default Store View</option>
-              </select>
-            </label>
-            <button type="button" onClick={() => { setBrand(null); void loadList(page, storeViewCode, savedCode); }}>Back</button>
+            <button type="button" onClick={() => { setBrand(null); void loadList(page, savedCode, search); }}>Back</button>
             <button type="button" className="primary" disabled={saving} onClick={() => void saveBrand()}>
               {saving ? "Saving…" : "Save"}
             </button>
@@ -255,16 +256,17 @@ export function BrandsPage({ ims }: { ims: Ims }) {
   }
 
   return (
-    <main className="conditional-blocks">
+    <main className="conditional-blocks admin-list">
       {busy ? <CommerceLoader /> : null}
-      <header className="page-header">
-        <h1>Brand Management</h1>
+      <header className="admin-list-header">
+        <h1>Brands</h1>
+        <button type="button" className="admin-primary" disabled={saving || !selectedCode} onClick={() => void saveAttribute()}>
+          {saving ? "Saving…" : "Save attribute"}
+        </button>
       </header>
-      <section className="widget-options">
-        <h2 className="widget-options-heading">Brand attribute</h2>
-        <p className="field-hint">Choose which product dropdown is the brand. There is no preset attribute.</p>
-        <div className="actions">
-          <label className="brand-inline">
+      <div className="admin-list-body">
+        <div className="admin-attribute-bar">
+          <label>
             Dropdown attribute
             <select value={selectedCode} onChange={event => setSelectedCode(event.target.value)}>
               <option value="">Select an attribute</option>
@@ -275,73 +277,95 @@ export function BrandsPage({ ims }: { ims: Ims }) {
               ))}
             </select>
           </label>
-          <button type="button" className="primary" disabled={saving || !selectedCode} onClick={() => void saveAttribute()}>
-            {saving ? "Saving…" : "Save attribute"}
-          </button>
+          <p className="field-hint">Choose which product dropdown is the brand. There is no preset attribute.</p>
         </div>
-      </section>
-      {message ? <p className="message">{message}</p> : null}
-      {!savedCode ? <p>Select a dropdown attribute to manage its brands.</p> : null}
-      {savedCode ? (
-        <>
-          <div className="page-header">
-            <p>{total} records found</p>
-            <label className="brand-inline">
-              Store view
-              <select
-                value={storeViewCode}
-                onChange={event => {
-                  const next = event.target.value;
-                  setStoreViewCode(next);
-                  void loadList(1, next, savedCode);
-                }}
-              >
-                <option value={DEFAULT_STORE_VIEW}>Default Store View</option>
-                <option value={ALL_STORE_VIEWS}>All Store Views</option>
-              </select>
-            </label>
-          </div>
-          <div className="brand-table-wrap">
-            <table className="brand-table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Store View</th>
-                  <th>Brand Attribute</th>
-                  <th>Slider image</th>
-                  <th>Show in Slider</th>
-                  <th>Position in Slider</th>
-                  <th>URL alias</th>
-                  <th>Description</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map(item => (
-                  <tr key={item.optionValue}>
-                    <td>{item.optionLabel}</td>
-                    <td>{scopeLabel(storeViewCode)}</td>
-                    <td>{item.attributeCode}</td>
-                    <td>{item.image ? <img className="brand-thumb" src={item.image} alt={item.image_alt || ""} /> : "No image"}</td>
-                    <td>{item.show_in_brand_slider_widget ? "Yes" : "No"}</td>
-                    <td>{item.slider_position ?? 0}</td>
-                    <td>{item.url_alias}</td>
-                    <td className="brand-description">{plainText(item.description || "")}</td>
-                    <td>
-                      <button type="button" onClick={() => void openBrand(item.optionValue, ALL_STORE_VIEWS)}>Edit</button>
-                    </td>
+        {message ? <p className="message">{message}</p> : null}
+        {!savedCode ? <p className="admin-empty">Select a dropdown attribute to manage its brands.</p> : null}
+        {savedCode ? (
+          <section className="admin-grid-card">
+            {search ? (
+              <div className="admin-active-filters">
+                <span>Active filters:</span>
+                <span className="admin-filter-chip">Keyword: {search}</span>
+                <button type="button" className="admin-clear" onClick={clearSearch}>Clear all</button>
+              </div>
+            ) : null}
+            <form className="admin-keyword" onSubmit={event => {
+              event.preventDefault();
+              const next = searchDraft.trim();
+              setSearch(next);
+              void loadList(1, savedCode, next);
+            }}>
+              <label className="sr-only" htmlFor="brand-keyword">Search by keyword</label>
+              <input
+                id="brand-keyword"
+                placeholder="Search by keyword"
+                value={searchDraft}
+                onChange={event => setSearchDraft(event.target.value)}
+              />
+              <button type="submit" className="admin-keyword-submit">Search</button>
+            </form>
+            <div className="admin-grid-toolbar">
+              <span className="admin-record-count">{total} records found</span>
+              <div className="admin-pager">
+                <label>
+                  <select value={PAGE_SIZE} disabled aria-label="Records per page">
+                    <option value={PAGE_SIZE}>{PAGE_SIZE}</option>
+                  </select>
+                  <span>per page</span>
+                </label>
+                <button type="button" disabled={page <= 1 || loading} onClick={() => void loadList(page - 1, savedCode, search)} aria-label="Previous page">‹</button>
+                <input
+                  key={page}
+                  aria-label="Current page"
+                  defaultValue={page}
+                  onBlur={event => goToPage(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === "Enter") goToPage((event.target as HTMLInputElement).value);
+                  }}
+                />
+                <span>of {pageCount}</span>
+                <button type="button" disabled={page >= pageCount || loading} onClick={() => void loadList(page + 1, savedCode, search)} aria-label="Next page">›</button>
+              </div>
+            </div>
+            <div className="admin-grid-wrap">
+              <table className="admin-grid">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Brand Attribute</th>
+                    <th>Slider image</th>
+                    <th>Show in Slider</th>
+                    <th>Position in Slider</th>
+                    <th>URL alias</th>
+                    <th>Description</th>
+                    <th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="actions">
-            <button type="button" disabled={page <= 1 || loading} onClick={() => void loadList(page - 1, storeViewCode, savedCode)}>Previous</button>
-            <span>Page {page} of {pageCount}</span>
-            <button type="button" disabled={page >= pageCount || loading} onClick={() => void loadList(page + 1, storeViewCode, savedCode)}>Next</button>
-          </div>
-        </>
-      ) : null}
+                </thead>
+                <tbody>
+                  {items.length === 0 ? (
+                    <tr><td colSpan={8}>We couldn't find any records.</td></tr>
+                  ) : null}
+                  {items.map(item => (
+                    <tr key={item.optionValue}>
+                      <td>{item.optionLabel}</td>
+                      <td>{item.attributeCode}</td>
+                      <td>{item.image ? <img className="brand-thumb" src={item.image} alt={item.image_alt || ""} /> : "No image"}</td>
+                      <td>{item.show_in_brand_slider_widget ? "Yes" : "No"}</td>
+                      <td>{item.slider_position ?? 0}</td>
+                      <td>{item.url_alias}</td>
+                      <td className="brand-description">{plainText(item.description || "")}</td>
+                      <td>
+                        <button type="button" className="admin-edit" onClick={() => void openBrand(item.optionValue)}>Edit</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
+      </div>
     </main>
   );
 }
