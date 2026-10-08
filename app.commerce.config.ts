@@ -1,4 +1,5 @@
 import { defineConfig } from '@adobe/aio-commerce-lib-app/config'
+import { MENU_CONTENT } from '@adobe/aio-commerce-lib-admin-ui/menu'
 
 export default defineConfig({
   metadata: {
@@ -13,7 +14,7 @@ export default defineConfig({
       label: 'Little Farms Admin',
       pageTitle: 'Little Farms Admin',
       description: 'Manage Little Farms features such as content blocks and brands.',
-      // Omit parentMenu — Admin UI SDK V2 nests the app under **Apps** (displayName section).
+      parentMenu: MENU_CONTENT,
       aclProtected: true
     }
   },

@@ -5,7 +5,8 @@
       "description": "Manage Little Farms features such as content blocks and brands.",
       "id": "blocks_management",
       "label": "Little Farms Admin",
-      "pageTitle": "Little Farms Admin"
+      "pageTitle": "Little Farms Admin",
+      "parentMenu": "content"
     }
   },
   "businessConfig": {
