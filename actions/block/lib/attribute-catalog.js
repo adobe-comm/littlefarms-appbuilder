@@ -315,13 +315,23 @@ function catalogHeaders (params) {
 
 function createAttributeCatalog (params, dependencies = {}) {
   const fetchImpl = dependencies.fetch || commerceFetch
+  const sharedState = dependencies.state
   const stateFactory = dependencies.stateFactory || stateLib.init
   const tokenFactory = dependencies.tokenFactory || Core.AuthClient.generateAccessToken
+  const sharedGetAccessToken = dependencies.getAccessToken
   let statePromise
 
-  async function getToken (refresh = false) {
+  function stateFactoryForCatalog () {
+    if (sharedState) return Promise.resolve(sharedState)
     statePromise ||= stateFactory({ region: params.STATE_REGION || 'amer' })
-    const state = await statePromise
+    return statePromise
+  }
+
+  async function getToken (refresh = false) {
+    if (sharedGetAccessToken) {
+      return sharedGetAccessToken(refresh)
+    }
+    const state = await stateFactoryForCatalog()
     if (!refresh) {
       const cached = await state.get(TOKEN_KEY)
       if (cached?.value) return cached.value
@@ -429,8 +439,9 @@ function createAttributeCatalog (params, dependencies = {}) {
     // Each condition is its own Commerce request. Magento applies every
     // category_id filter through addCategoriesFilter, so two category rows
     // in one search become "in both categories" even when the group is ANY.
-    const sets = []
-    for (const child of node.conditions) sets.push(await matchNode(child, depth + 1))
+    const sets = await Promise.all(
+      node.conditions.map(child => matchNode(child, depth + 1))
+    )
     return node.aggregator === 'any' ? unionSets(sets) : intersectSets(sets)
   }
 
@@ -442,14 +453,14 @@ function createAttributeCatalog (params, dependencies = {}) {
   }
 
   async function listAttributes () {
-    const cache = await createAttributeState(params, stateFactory)
+    const cache = await createAttributeState(params, stateFactoryForCatalog)
     return cache.load(fetchAttributeList)
   }
 
   async function attributeOptions (code) {
     const attributeCode = String(code || '').trim()
     if (!attributeCode) return null
-    const cache = await createAttributeState(params, stateFactory)
+    const cache = await createAttributeState(params, stateFactoryForCatalog)
     const { record, expiration } = await cache.read()
     if (!record || needsAttributeSync(record, expiration)) {
       const attributes = await listAttributes()
@@ -483,7 +494,8 @@ function createAttributeCatalog (params, dependencies = {}) {
   return {
     listAttributes,
     attributeOptions,
-    syncAttributes: () => createAttributeState(params, stateFactory).then(cache => cache.sync(fetchAttributeList)),
+    syncAttributes: () =>
+      createAttributeState(params, stateFactoryForCatalog).then(cache => cache.sync(fetchAttributeList)),
     async listCategories () {
       if (!params.COMMERCE_CORE_GRAPHQL_URL) {
         const error = new Error('COMMERCE_CORE_GRAPHQL_URL is not configured.')

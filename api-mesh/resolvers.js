@@ -35,6 +35,71 @@ function secretsFrom (context) {
   return (context && context.secrets) || {}
 }
 
+var WEEK_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+
+function mapDayHours (row) {
+  row = row || {}
+  return {
+    open: row.open === true,
+    from: row.from || '',
+    to: row.to || ''
+  }
+}
+
+function mapWeekHours (source) {
+  source = source || {}
+  var hours = {}
+  WEEK_DAYS.forEach(function (day) {
+    hours[day] = mapDayHours(source[day])
+  })
+  return hours
+}
+
+function mapLocation (entry) {
+  if (!entry || entry.locationId == null) return null
+  return {
+    locationId: Number(entry.locationId),
+    title: entry.title || '',
+    status: entry.status === 'disabled' ? 'disabled' : 'enabled',
+    logo: entry.logo || '',
+    storeUrl: entry.storeUrl || '',
+    country: entry.country || '',
+    state: entry.state || '',
+    city: entry.city || '',
+    street: entry.street || '',
+    zip: entry.zip || '',
+    phone: entry.phone || '',
+    email: entry.email || '',
+    websiteUrl: entry.websiteUrl || '',
+    openInNewTab: entry.openInNewTab === true,
+    storeViews: Array.isArray(entry.storeViews) ? entry.storeViews.filter(Boolean) : [],
+    description: entry.description || '',
+    sortOrder: entry.sortOrder || '',
+    locationImage: entry.locationImage || '',
+    mapMarker: entry.mapMarker || '',
+    metaTitle: entry.metaTitle || '',
+    metaKeywords: entry.metaKeywords || '',
+    metaDescription: entry.metaDescription || '',
+    isFeatured: entry.isFeatured === true,
+    zoom: entry.zoom || '',
+    latitude: entry.latitude || '',
+    longitude: entry.longitude || '',
+    storeBanner: entry.storeBanner || '',
+    travelSuggestion: entry.travelSuggestion || '',
+    services: Array.isArray(entry.services) ? entry.services.filter(Boolean) : [],
+    storeContent: entry.storeContent || '',
+    galleries: Array.isArray(entry.galleries) ? entry.galleries.filter(Boolean) : [],
+    galleryTitle: entry.galleryTitle || '',
+    galleryDescription: entry.galleryDescription || '',
+    teamProfiles: Array.isArray(entry.teamProfiles) ? entry.teamProfiles.filter(Boolean) : [],
+    promotions: entry.promotions || '',
+    isStore: entry.isStore === true,
+    storeHours: mapWeekHours(entry.storeHours),
+    isCafe: entry.isCafe === true,
+    cafeHours: mapWeekHours(entry.cafeHours)
+  }
+}
+
 function mapBrand (entry) {
   if (!entry || entry.id == null || entry.id === '') return null
   return {
@@ -451,6 +516,58 @@ module.exports = {
               total: total,
               pageCount: pageSize > 0 ? Math.ceil(total / pageSize) : 0,
               items: (payload.items || []).map(mapBrand).filter(Boolean)
+            }
+          })
+        }
+      },
+      littleFarmsLocation: {
+        resolve: function (_root, args, context) {
+          var secrets = secretsFrom(context)
+          var locationId = args.locationId != null ? String(args.locationId).trim() : ''
+          var title = String(args.title || '').trim()
+          var storeUrl = String(args.storeUrl || '').trim()
+          var lookups = [locationId, title, storeUrl].filter(Boolean)
+          if (lookups.length !== 1) {
+            return Promise.reject(new Error('littleFarmsLocation requires exactly one of locationId, title, or storeUrl.'))
+          }
+          var body = { operation: 'get' }
+          if (locationId) body.locationId = locationId
+          else if (title) body.title = title
+          else body.storeUrl = storeUrl
+          return postJson(
+            secrets.LITTLEFARMS_LOCATION_STOREFRONT_URL,
+            '',
+            body,
+            { skipSecret: true }
+          ).then(function (payload) {
+            return mapLocation(payload.location)
+          })
+        }
+      },
+      littleFarmsLocations: {
+        resolve: function (_root, args, context) {
+          var secrets = secretsFrom(context)
+          var body = { operation: 'list' }
+          if (args.country) body.country = String(args.country).trim()
+          if (args.city) body.city = String(args.city).trim()
+          if (args.title) body.title = String(args.title).trim()
+          if (typeof args.isFeatured === 'boolean') body.isFeatured = args.isFeatured
+          if (args.page != null) body.page = args.page
+          if (args.pageSize != null) body.pageSize = args.pageSize
+          return postJson(
+            secrets.LITTLEFARMS_LOCATION_STOREFRONT_URL,
+            '',
+            body,
+            { skipSecret: true }
+          ).then(function (payload) {
+            var pageSize = Number(payload.pageSize) || 50
+            var total = Number(payload.total) || 0
+            return {
+              page: Number(payload.page) || 1,
+              pageSize: pageSize,
+              total: total,
+              pageCount: pageSize > 0 ? Math.ceil(total / pageSize) : 0,
+              items: (payload.items || []).map(mapLocation).filter(Boolean)
             }
           })
         }

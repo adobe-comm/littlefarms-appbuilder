@@ -47,33 +47,18 @@ async function ensureCollection (client) {
   }
 }
 
-async function ensureIndex (collection, specification, options) {
-  try {
-    await collection.createIndex(specification, options)
-  } catch (error) {
-    if (!isAlreadyExists(error)) throw error
-  }
-}
-
 async function openCollection (params) {
-  const token = await Core.AuthClient.generateAccessToken(params)
+  const accessToken = String(params.__dbAccessToken || '').trim()
+  const token = accessToken
+    ? { access_token: accessToken }
+    : await Core.AuthClient.generateAccessToken(params)
+  const region = params.DB_REGION || 'amer'
   const db = await libDb.init({
     token: token.access_token,
-    region: params.DB_REGION || 'amer'
+    region
   })
   const client = await db.connect()
   const collection = await ensureCollection(client)
-  await ensureIndex(
-    collection,
-    { 'scope.environmentId': 1, 'scope.storeViewCode': 1, normalizedName: 1 },
-    { unique: true, name: 'block_name_scope' }
-  )
-  await ensureIndex(
-    collection,
-    { 'scope.environmentId': 1, 'scope.storeViewCode': 1, blockId: 1 },
-    { unique: true, name: 'block_id_scope' }
-  )
-  await ensureIndex(collection, { updatedAt: -1 }, { name: 'block_updated' })
   return { client, collection }
 }
 

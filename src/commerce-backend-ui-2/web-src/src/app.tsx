@@ -7,6 +7,7 @@ import config from "../../../commerce-extensibility-1/.generated/app.commerce.co
 import { AppShell, defaultAppModuleId } from "./components/app-shell.tsx";
 import { CommerceLoader } from "./components/commerce-loader.tsx";
 import { BrandsPage } from "./pages/brands-page.tsx";
+import { LocationsPage } from "./pages/locations-page.tsx";
 import { MainPage } from "./pages/main-page.tsx";
 import { SettingsPage } from "./pages/settings-page.tsx";
 
@@ -127,8 +128,9 @@ function App() {
     <AppShell activeModuleId={activeModuleId} onModuleChange={setActiveModuleId}>
       {activeModuleId === "blocks-management" && <MainPage ims={ims} />}
       {activeModuleId === "brands-management" && <BrandsPage ims={ims} />}
+      {activeModuleId === "locations" && <LocationsPage ims={ims} />}
       {activeModuleId === "settings" && <SettingsPage ims={ims} />}
-      {activeModuleId !== "blocks-management" && activeModuleId !== "brands-management" && activeModuleId !== "settings" && (
+      {activeModuleId !== "blocks-management" && activeModuleId !== "brands-management" && activeModuleId !== "locations" && activeModuleId !== "settings" && (
         <main className="conditional-blocks">
           <p>This module is not available yet.</p>
         </main>

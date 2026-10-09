@@ -238,6 +238,70 @@ runtimeManifest:
             memorySize: 512
           annotations:
             <<: *admin-annotations
+        location-list:
+          function: ../../actions/location/admin/list/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        location-mass:
+          function: ../../actions/location/admin/mass/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        location-write:
+          function: ../../actions/location/admin/write/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        location-asset:
+          function: ../../actions/location/admin/asset/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 20000
+            memorySize: 512
+          annotations:
+            <<: *admin-annotations
+        location-geocode:
+          function: ../../actions/location/admin/geocode/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 15000
+            memorySize: 256
+          annotations:
+            <<: *admin-annotations
+        location-storefront:
+          function: ../../actions/location/storefront/location/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 15000
+            memorySize: 512
+          annotations:
+            final: true
+            include-ims-credentials: true
         brand-storefront:
           function: ../../actions/brand/storefront/brand/index.js
           web: yes
@@ -305,7 +369,7 @@ runtimeManifest:
         storefront-warm:
           feed: /whisk.system/alarms/interval
           inputs:
-            minutes: 4
+            minutes: 1
             trigger_payload: '{"warm":true}'
       rules:
         attribute-sync-monthly-rule:
@@ -317,3 +381,6 @@ runtimeManifest:
         storefront-warm-brands:
           trigger: storefront-warm
           action: brand-storefront
+        storefront-warm-locations:
+          trigger: storefront-warm
+          action: location-storefront

@@ -36,10 +36,14 @@ export function HtmlEditor({
   id,
   value,
   onChange,
+  label = "Description",
+  hint = "HTML is stored as entered.",
 }: {
   id: string;
   value: string;
   onChange: (html: string) => void;
+  label?: string;
+  hint?: string;
 }) {
   const [source, setSource] = useState(false);
   const [seed, setSeed] = useState(value);
@@ -52,7 +56,7 @@ export function HtmlEditor({
   return (
     <div className="brand-html-editor">
       <div className="brand-html-editor-heading">
-        <span id={`${id}-label`}>Description</span>
+        {label ? <span id={`${id}-label`}>{label}</span> : null}
         <button type="button" onClick={toggleSource}>
           Show / Hide Editor
         </button>
@@ -61,7 +65,7 @@ export function HtmlEditor({
         <textarea
           id={id}
           className="brand-html-source"
-          aria-labelledby={`${id}-label`}
+          aria-labelledby={label ? `${id}-label` : undefined}
           value={value}
           onChange={event => onChange(event.target.value)}
         />
@@ -85,7 +89,7 @@ export function HtmlEditor({
           }}
         />
       )}
-      <span className="field-hint">HTML is stored as entered.</span>
+      {hint ? <span className="field-hint">{hint}</span> : null}
     </div>
   );
 }

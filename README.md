@@ -101,6 +101,38 @@ Confirm with:
 aio app db index list littlefarms_brands --json
 ```
 
+## Block database indexes
+
+Block reads do not create indexes. `littlefarms_blocks` on `748062-littlefarms-stage` already has these three. After the app moves to a new Runtime namespace, create them once before using the block list. Set `--region` to the same value as `DB_REGION` when that namespace is not in `amer`.
+
+```bash
+aio app db index create littlefarms_blocks \
+  --spec '{"scope.environmentId":1,"scope.storeViewCode":1,"normalizedName":1}' \
+  --name block_name_scope \
+  --unique
+
+aio app db index create littlefarms_blocks \
+  --spec '{"scope.environmentId":1,"scope.storeViewCode":1,"blockId":1}' \
+  --name block_id_scope \
+  --unique
+
+aio app db index create littlefarms_blocks \
+  --spec '{"updatedAt":-1}' \
+  --name block_updated
+```
+
+| Index | Used for |
+|-------|----------|
+| `block_name_scope` | One block title per environment and store view |
+| `block_id_scope` | Lookup by `blockId` |
+| `block_updated` | List order by `updatedAt` |
+
+Confirm with:
+
+```bash
+aio app db index list littlefarms_blocks --json
+```
+
 ## Config
 
 ### `.env`

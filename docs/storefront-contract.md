@@ -6,7 +6,8 @@ Headless consumers (EDS, API Mesh, storefront servers) must **not** use Admin IM
 
 | Action | Auth |
 |--------|------|
-| **`block-storefront`** (list / get presets) | **Public** — no secret; only **enabled** presets are returned. A 4-minute alarm sends `warm: true`. The action returns `{ "message": "action is live" }` and does not open the database |
+| **`block-storefront`** (list / get presets) | **Public** — no secret; only **enabled** presets are returned. A 1-minute alarm sends `warm: true`. The action returns `{ "message": "action is live" }` and does not open the database |
+| **`location-storefront`** (list / get locations) | **Public** — no secret; only **enabled** locations are returned. Same warm alarm as blocks/brands |
 | **`block-evaluate`** (PDP placement) | **`x-conditional-block-secret`** = App Builder `EVALUATE_SHARED_SECRET` |
 
 Browsers should call **API Mesh GraphQL**, not App Builder URLs directly. Mesh holds the evaluate secret for placement queries only ([`../api-mesh/`](../api-mesh/)).
@@ -89,7 +90,27 @@ By **title** (Admin **Title** / `name`; case-insensitive):
 }
 ```
 
-For **`littlefarms_featured_recommended`**, `operation: "get"` with `resolveConditions: true` (the default on get) evaluates conditions against Commerce, returns matching SKUs in **`productSkus`**, and caches that SKU list in **App Builder State** for **`PRESET_RESULT_CACHE_TTL`** seconds (default **600** / 10 minutes). Cache for a block is cleared when the block is saved or deleted, or when an admin runs **`block-cache-flush`**. `operation: "list"` does not resolve SKUs.
+For **`littlefarms_featured_recommended`**, `operation: "get"` with `resolveConditions: true` (the default on get) evaluates conditions against Commerce, returns matching SKUs in **`productSkus`**, and caches that SKU list in **App Builder State** for **`PRESET_RESULT_CACHE_TTL`** seconds (default **600** / 10 minutes). The same TTL applies to a **full public block** cache keyed by **`blockId`** (or preset id) and **`updatedAt`**, so repeat gets skip the database and Commerce when the preset has not changed. Empty SKU lists are cached as well. Cache for a block is cleared when the block is saved or deleted, or when an admin runs **`block-cache-flush`**. `operation: "list"` does not resolve SKUs.
+
+Set **`LOG_LEVEL=debug`** or **`PROFILE=true`** on the action to log per-phase timings (`config`, `stateInit`, `db`, `blockCacheRead`, `enrich`, etc.) in activation logs.
+
+`block-storefront` does not create database indexes. `littlefarms_blocks` needs `block_name_scope`, `block_id_scope`, and `block_updated` once per Runtime namespace. Confirm with `aio app db index list littlefarms_blocks --json`. Create them from the repo root when a namespace does not have them yet. Add `--region` when `DB_REGION` is not `amer`. See [Block database indexes](../README.md#block-database-indexes).
+
+```bash
+aio app db index create littlefarms_blocks \
+  --spec '{"scope.environmentId":1,"scope.storeViewCode":1,"normalizedName":1}' \
+  --name block_name_scope \
+  --unique
+
+aio app db index create littlefarms_blocks \
+  --spec '{"scope.environmentId":1,"scope.storeViewCode":1,"blockId":1}' \
+  --name block_id_scope \
+  --unique
+
+aio app db index create littlefarms_blocks \
+  --spec '{"updatedAt":-1}' \
+  --name block_updated
+```
 
 API Mesh loads product details for a single block’s SKUs with Live Search `productSearch` (`phrase: ""`, filter attribute `sku` `in` the SKU list). `littleFarmsBlocks` does not call `productSearch`. `littleFarmsBlock` accepts an optional `filter` list (`attribute` plus `eq`, `in`, `startsWith`, `contains`, or `range`). The mesh sends those clauses first and always appends the block SKU clause. A client `sku` clause is rejected. The mesh returns them on **`products`** in the same order as the SKUs, leaving out SKUs that the extra filter excluded. **`productsStatus`** is `ok`, `empty`, `error`, or `commerce_unconfigured`. The SKU attribute, and every attribute in `filter`, must be filterable in search. Set `COMMERCE_CORE_GRAPHQL_URL` in mesh secrets. The REST action itself still returns SKUs only.
 
@@ -245,6 +266,29 @@ aio app db index create littlefarms_brands \
 | `brand_name` | `littleFarmsBrand(name:)` |
 
 `littleFarmsBrands(name:)` still matches the brand name as a contains search on the rows the flag indexes return. Confirm the indexes with `aio app db index list littlefarms_brands --json`.
+
+### Store locations
+
+GraphQL: `littleFarmsLocation` and `littleFarmsLocations` (see [`../api-mesh/schema.graphql`](../api-mesh/schema.graphql)). Mesh calls the public **`location-storefront`** action.
+
+**List enabled locations:**
+
+```http
+POST /api/v1/web/littlefarms-appbuilder/location-storefront
+Content-Type: application/json
+
+{"operation":"list","page":1,"pageSize":50,"country":"SG"}
+```
+
+Optional list filters: `country` (exact ISO code), `city` and `title` (contains, case-insensitive), `isFeatured` (boolean). Results are sorted by Admin **Sort Order**, then **Location ID**.
+
+**Get one location** — provide exactly one of `locationId`, `title` (exact, case-insensitive), or `storeUrl`:
+
+```json
+{"operation":"get","locationId":1}
+```
+
+Response shape matches the Admin location form (`location` object with hours, map fields, rich content, and image URLs).
 
 ---
 

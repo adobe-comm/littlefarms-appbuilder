@@ -1,11 +1,18 @@
 const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
-const { createPresetStore } = require('../../lib/preset-store')
+const { createPresetStore, readBlockId } = require('../../lib/preset-store')
 const { withCommerceCoreGraphqlUrl } = require('../../lib/enrich-commerce-params')
 const { enrichPresetForStorefront } = require('../../lib/enrich-storefront-blocks')
 const { toPublicBlock } = require('../../lib/public-preset')
 const { createPresetResultCache } = require('../../lib/preset-result-cache')
 const { createAttributeCatalog } = require('../../lib/attribute-catalog')
+const {
+  initRuntimeState,
+  createAccessTokenProvider,
+  shouldProfileRequest,
+  createRequestTimings,
+  logRequestTimings
+} = require('../../lib/runtime-state')
 
 function isWarmPing (params) {
   if (params.warm === true || params.warm === 'true') return true
@@ -69,35 +76,78 @@ async function loadPresetForGet (store, scope, params) {
   return preset
 }
 
+function blockCacheIdentity (preset) {
+  const blockId = readBlockId(preset)
+  if (blockId != null) return String(blockId)
+  const id = String(preset?.id || '').trim()
+  return id || null
+}
+
 async function main (params) {
   const logger = Core.Logger('block-storefront', { level: params.LOG_LEVEL || 'info' })
+  const profile = shouldProfileRequest(params)
+  const timings = createRequestTimings(profile)
 
   try {
     if (isWarmPing(params)) {
       return { statusCode: 200, body: { message: 'action is live' } }
     }
 
-    const store = createPresetStore(params)
-    const scope = store.scope()
     const operation = String(params.operation || 'list').trim().toLowerCase()
 
     if (operation === 'get') {
-      params = await withCommerceCoreGraphqlUrl(params)
-      let preset
-      try {
-        preset = await loadPresetForGet(store, scope, params)
-      } catch (error) {
-        return errorResponse(error.statusCode || 400, error.message, logger)
+      const scope = createPresetStore(params).scope()
+      const tokenProvider = createAccessTokenProvider(params)
+
+      const [resolvedParams, runtimeState, preset] = await Promise.all([
+        timings.track('config', () => withCommerceCoreGraphqlUrl(params)),
+        timings.track('stateInit', () => initRuntimeState(params)),
+        timings.track('db', async () => {
+          const accessToken = await tokenProvider.getAccessToken()
+          const store = createPresetStore({ ...params, __dbAccessToken: accessToken })
+          return loadPresetForGet(store, store.scope(), params)
+        })
+      ])
+
+      const cache = await createPresetResultCache(resolvedParams, null, { state: runtimeState })
+      const catalog = createAttributeCatalog(resolvedParams, {
+        state: runtimeState,
+        getAccessToken: refresh => tokenProvider.getAccessToken(refresh)
+      })
+      const context = { logger, cache, catalog }
+
+      const cacheId = blockCacheIdentity(preset)
+      if (cacheId) {
+        const cachedBlock = await timings.track('blockCacheRead', () =>
+          cache.getBlock(scope.environmentId, cacheId, preset.updatedAt)
+        )
+        if (cachedBlock) {
+          logger.info(`Block ${cacheId} served from State (full block)`)
+          logRequestTimings(logger, 'get', timings, { blockCache: 'hit' })
+          return { statusCode: 200, body: { block: cachedBlock } }
+        }
       }
-      const context = {
-        logger,
-        cache: await createPresetResultCache(params),
-        catalog: createAttributeCatalog(params)
+
+      const block = await timings.track('enrich', () =>
+        enrichPresetForStorefront(preset, resolvedParams, context)
+      )
+
+      if (cacheId) {
+        try {
+          await timings.track('blockCacheWrite', () =>
+            cache.putBlock(scope.environmentId, cacheId, preset.updatedAt, block)
+          )
+        } catch (cacheError) {
+          logger.warn(`Full block cache write failed for ${cacheId}: ${cacheError.message}`)
+        }
       }
-      const block = await enrichPresetForStorefront(preset, params, context)
+
+      logRequestTimings(logger, 'get', timings, { blockCache: cacheId ? 'miss' : 'skipped' })
       return { statusCode: 200, body: { block } }
     }
 
+    const store = createPresetStore(params)
+    const scope = store.scope()
     const listCache = await createPresetResultCache(params)
     const cached = await listCache.getList(scope.environmentId)
     if (cached) {

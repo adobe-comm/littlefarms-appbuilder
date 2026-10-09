@@ -1,6 +1,6 @@
 # API Mesh — Little Farms Blocks (REST → GraphQL)
 
-This mesh exposes **only** Little Farms block REST actions as GraphQL. It does **not** include Adobe Commerce catalog in the schema for now. EDS can call a dedicated mesh endpoint for `littleFarmsBlock` / `littleFarmsBlocks`; Commerce `products` queries stay on the Commerce GraphQL endpoint (or a separate mesh you add later).
+This mesh exposes Little Farms **blocks**, **brands**, and **store locations** App Builder actions as GraphQL. It does **not** include Adobe Commerce catalog in the schema for now. EDS can call a dedicated mesh endpoint for `littleFarmsBlock`, `littleFarmsBrand`, `littleFarmsLocation`, and related fields; Commerce `products` queries stay on the Commerce GraphQL endpoint (or a separate mesh you add later).
 
 ## Architecture
 
@@ -9,6 +9,8 @@ EDS / server
     → Little Farms API Mesh (this config)
         → resolvers.js
             → block-storefront (presets: list / get)
+            → brand-storefront (brands: list / get / directory)
+            → location-storefront (locations: list / get)
 ```
 
 **Preset list/get** is public on `block-storefront` (no shared secret). `littleFarmsBlocks` takes no arguments and returns every enabled preset.
@@ -23,6 +25,7 @@ Browser clients should use this mesh endpoint (with CORS); do not call App Build
 | `littleFarmsBlocks` | Every enabled preset. No arguments. Returns block fields only. SKUs and `products` come from `littleFarmsBlock` |
 | `littleFarmsBrandsList` | Every active brand as `id`, `name`, `slug`, and `image`. Inactive, hidden, and removed brands are left out. The action stores that directory in State until a brand save flushes it |
 | `littleFarmsBrand` / `littleFarmsBrands` | One brand, or one page of full brand records. `littleFarmsBrands` returns `page`, `pageSize`, `total`, `pageCount`, and `items`. It accepts `name`, `isActive`, `isNewBrand`, `isTopBrand`, `isFeatured`, `showInBrandListWidget`, and `showInBrandSliderWidget`. Omit a flag to skip that filter. Omit `isActive` to keep active brands only |
+| `littleFarmsLocation` / `littleFarmsLocations` | One enabled store location, or a paginated list. Lookup by **locationId**, **title** (exact, case-insensitive), or **storeUrl**. List accepts optional `country`, `city`, `title` (contains), and `isFeatured`. Disabled locations are never returned. Sort order follows Admin **Sort Order**, then **Location ID** |
 
 See [`schema.graphql`](./schema.graphql) and [`meshConfig.json`](./meshConfig.json) (JsonSchema stub source + programmatic resolvers; no Commerce).
 
@@ -89,9 +92,36 @@ query {
 }
 ```
 
+**Store locator (enabled locations):**
+
+```graphql
+{
+  littleFarmsLocations(country: "SG", page: 1, pageSize: 50) {
+    page
+    total
+    items {
+      locationId
+      title
+      city
+      street
+      latitude
+      longitude
+      phone
+      isFeatured
+      storeHours { monday { open from to } }
+    }
+  }
+  littleFarmsLocation(locationId: 1) {
+    title
+    storeContent
+    cafeHours { saturday { open from to } }
+  }
+}
+```
+
 ## Response cache
 
-`meshConfig.responseConfig.cache` is `true`, and the mesh response sets `Cache-Control: public, max-age=60` ([Caching](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/), [cache-control headers](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/cache-control-headers/)). A repeated identical GraphQL request can be served from the mesh for 60 seconds. The cache key is the whole request, so a different `blockId` or different arguments is a different entry. There is no per-query or per-id setting.
+`meshConfig.responseConfig.cache` is `true`, and the mesh response sets `Cache-Control: public, max-age=300` ([Caching](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/), [cache-control headers](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/cache-control-headers/)). A repeated identical GraphQL request can be served from the mesh for 5 minutes. The cache key is the whole request, so a different `blockId` or different arguments is a different entry. There is no per-query or per-id setting.
 
 A brand or block save does not clear one entry. `aio api-mesh:cache:purge -a` clears every cached response for this mesh. After a mesh update that changes cached data, purge before measuring again.
 

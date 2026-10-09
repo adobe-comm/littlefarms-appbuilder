@@ -1,0 +1,354 @@
+/* Locations module only — imported from locations-page / locations-form, not global index.css */
+
+.locations-page .locations-tools-row {
+  justify-content: flex-end;
+}
+
+.locations-page .admin-grid-toolbar-start {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.locations-page .admin-mass {
+  position: relative;
+}
+
+.locations-page .admin-mass-toggle {
+  position: relative;
+  min-width: 148px;
+  height: 32px;
+  margin: 0;
+  padding: 0 28px 0 10px;
+  border: 1px solid #adadad;
+  border-radius: 1px;
+  background: #fff;
+  color: #303030;
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+.locations-page .admin-mass-toggle::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  margin-top: -2px;
+  border: 4px solid transparent;
+  border-top-color: #303030;
+  border-bottom-width: 0;
+}
+
+.locations-page .admin-mass-toggle.open::after {
+  margin-top: -6px;
+  border-top-width: 0;
+  border-bottom: 4px solid #303030;
+}
+
+.locations-page .admin-view-toggle,
+.locations-page .admin-export-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin: 0;
+  padding: 0 8px 6px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #303030;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.locations-page .admin-view-toggle::before,
+.locations-page .admin-export-toggle::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+}
+
+.locations-page .admin-view-toggle::before {
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 5c5 0 9.3 3.1 11 7-1.7 3.9-6 7-11 7S2.7 15.9 1 12c1.7-3.9 6-7 11-7zm0 2C8.4 7 5.3 9.2 3.8 12 5.3 14.8 8.4 17 12 17s6.7-2.2 8.2-5C18.7 9.2 15.6 7 12 7zm0 2.2A2.8 2.8 0 1 1 12 15a2.8 2.8 0 0 1 0-5.6z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.locations-page .admin-export-toggle::before {
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 3v10.2l3.3-3.3 1.4 1.4L12 16.9 7.3 11.3l1.4-1.4 3.3 3.3V3h0zM5 19h14v2H5z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.locations-page .admin-view-toggle::after,
+.locations-page .admin-export-toggle::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+}
+
+.locations-page .admin-view-toggle.open,
+.locations-page .admin-export-toggle.open {
+  border-bottom-color: #eb5202;
+}
+
+.locations-page .admin-bookmark-menu {
+  right: 0;
+  left: auto;
+  min-width: 140px;
+}
+
+.locations-page .admin-sort {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.locations-page .admin-sort::after {
+  content: "";
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: 2px;
+  border: 4px solid transparent;
+}
+
+.locations-page .admin-sort.desc::after {
+  border-top-color: #fff;
+  border-bottom-width: 0;
+}
+
+.locations-page .admin-sort.asc::after {
+  border-bottom-color: #fff;
+  border-top-width: 0;
+  vertical-align: -2px;
+}
+
+.locations-page .admin-check-cell {
+  width: 46px;
+  text-align: center;
+}
+
+.locations-page .admin-check-cell input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+}
+
+.location-edit-page .lf-section-layout-header h1 {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.location-edit-page .field-row label {
+  font-weight: 400;
+  text-align: right;
+}
+
+.location-edit-page .field-row > .location-field-control,
+.location-edit-page .field-row > .location-field-control-multiselect {
+  min-width: 0;
+}
+
+/* General Information — match Magento admin control widths (not full 640px row). */
+.location-edit-page .field-row select.location-select-status {
+  width: 7.25rem;
+  min-width: 7.25rem;
+  max-width: 7.25rem;
+  box-sizing: border-box;
+}
+
+.location-edit-page .field-row select.location-select-directory {
+  width: auto;
+  box-sizing: border-box;
+}
+
+.location-edit-page .field-row select.location-select-directory:disabled {
+  opacity: 1;
+  color: #303030;
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.location-edit-page .field-row select.location-yesno:not(.location-select-status) {
+  width: auto;
+  min-width: 5.5rem;
+  max-width: 7.25rem;
+}
+
+.location-edit-page .field-row input[type="file"] {
+  width: auto;
+  max-width: none;
+  height: auto;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.location-edit-page .location-field-control-multiselect .location-multiselect {
+  width: 100%;
+}
+
+.location-edit-page .location-field-control-multiselect select[multiple] {
+  display: block;
+  width: 100% !important;
+  max-width: none !important;
+  height: 180px;
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
+
+.location-edit-page .location-file,
+.location-edit-page .location-multiselect {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.location-edit-page .location-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-weight: 400;
+}
+
+.location-edit-page .field-row .location-check input {
+  width: 16px;
+  height: 16px;
+  max-width: 16px;
+  padding: 0;
+}
+
+.location-edit-page .location-help {
+  width: 22px;
+  height: 22px;
+  margin-top: 4px;
+  border: 1px solid #adadad;
+  border-radius: 50%;
+  background: #fff;
+  color: #303030;
+  font-size: 13px;
+  line-height: 1;
+  cursor: help;
+}
+
+.location-edit-page .location-map-button {
+  border: 1px solid #adadad;
+  background: #e3e3e3;
+  color: #303030;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.location-edit-page .location-map-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.location-edit-page .location-map {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 360px;
+  margin-top: 8px;
+  border: 1px solid #d6d6d6;
+  background: #ececec;
+  color: #666;
+}
+
+.location-edit-page .location-map iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.location-edit-page .location-map p {
+  margin: 0;
+  padding: 16px;
+}
+
+.location-edit-page .location-editor-row {
+  align-items: start;
+}
+
+.location-edit-page .location-editor-row .brand-html-editor {
+  width: 100%;
+  max-width: 720px;
+}
+
+.location-edit-page .location-editor-row .brand-html-editor-heading > span,
+.location-edit-page .location-editor-row .brand-html-editor > .field-hint {
+  display: none;
+}
+
+.location-edit-page .location-hours {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+}
+
+.location-edit-page .location-hours th,
+.location-edit-page .location-hours td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e3e3e3;
+  text-align: left;
+  font-weight: 400;
+}
+
+.location-edit-page .location-hours th {
+  background: #f5f5f5;
+  font-weight: 600;
+}
+
+.location-edit-page .location-hours tbody tr:nth-child(even) td {
+  background: #fafafa;
+}
+
+.location-edit-page .location-hours input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.location-edit-page .location-hours-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.location-edit-page .location-hours-range input.location-hours-time {
+  width: 4.75rem;
+  min-width: 4.75rem;
+  max-width: 4.75rem;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #adadad;
+  background: #fff;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.location-edit-page .location-hours-range input.location-hours-time:disabled {
+  background: #f5f5f5;
+  color: #666;
+}

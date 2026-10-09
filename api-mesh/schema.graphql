@@ -112,6 +112,15 @@ extend type Query {
     pageSize: Int
   ): LittleFarmsBrandsPayload!
   littleFarmsBrandsList: [LittleFarmsBrandSummary!]!
+  littleFarmsLocation(locationId: Int, title: String, storeUrl: String): LittleFarmsLocation
+  littleFarmsLocations(
+    country: String
+    city: String
+    title: String
+    isFeatured: Boolean
+    page: Int
+    pageSize: Int
+  ): LittleFarmsLocationsPayload!
 }
 
 type LittleFarmsBrandsPayload {
@@ -157,4 +166,70 @@ type LittleFarmsBrand {
   smallImage: String
   smallImageAlt: String
   storeViewCode: String!
+}
+
+type LittleFarmsDayHours {
+  open: Boolean!
+  from: String
+  to: String
+}
+
+type LittleFarmsWeekHours {
+  monday: LittleFarmsDayHours!
+  tuesday: LittleFarmsDayHours!
+  wednesday: LittleFarmsDayHours!
+  thursday: LittleFarmsDayHours!
+  friday: LittleFarmsDayHours!
+  saturday: LittleFarmsDayHours!
+  sunday: LittleFarmsDayHours!
+}
+
+type LittleFarmsLocation {
+  locationId: Int!
+  title: String!
+  status: String!
+  logo: String
+  storeUrl: String
+  country: String
+  state: String
+  city: String
+  street: String
+  zip: String
+  phone: String
+  email: String
+  websiteUrl: String
+  openInNewTab: Boolean!
+  storeViews: [String!]!
+  description: String
+  sortOrder: String
+  locationImage: String
+  mapMarker: String
+  metaTitle: String
+  metaKeywords: String
+  metaDescription: String
+  isFeatured: Boolean!
+  zoom: String
+  latitude: String
+  longitude: String
+  storeBanner: String
+  travelSuggestion: String
+  services: [String!]!
+  storeContent: String
+  galleries: [String!]!
+  galleryTitle: String
+  galleryDescription: String
+  teamProfiles: [String!]!
+  promotions: String
+  isStore: Boolean!
+  storeHours: LittleFarmsWeekHours!
+  isCafe: Boolean!
+  cafeHours: LittleFarmsWeekHours!
+}
+
+type LittleFarmsLocationsPayload {
+  page: Int!
+  pageSize: Int!
+  total: Int!
+  pageCount: Int!
+  items: [LittleFarmsLocation!]!
 }

@@ -36,12 +36,10 @@ async function resolveConditionResultSkus (preset, params, options = {}) {
   const products = await catalog.matchProducts(presetToMatchRule(preset))
   const skus = products.map(product => product.sku).filter(Boolean)
 
-  if (skus.length > 0) {
-    try {
-      await cache.put(cacheKey, { skus, cachedAt: Date.now() })
-    } catch (cacheError) {
-      options.logger?.warn?.(`Preset SKU cache write failed for block ${cacheKey}: ${cacheError.message}`)
-    }
+  try {
+    await cache.put(cacheKey, { skus, cachedAt: Date.now() })
+  } catch (cacheError) {
+    options.logger?.warn?.(`Preset SKU cache write failed for block ${cacheKey}: ${cacheError.message}`)
   }
   return skus
 }
