@@ -271,16 +271,18 @@ aio app db index create littlefarms_brands \
 
 GraphQL: `littleFarmsLocation` and `littleFarmsLocations` (see [`../api-mesh/schema.graphql`](../api-mesh/schema.graphql)). Mesh calls the public **`location-storefront`** action.
 
-**List enabled locations:**
+**Directory (General Information, all enabled locations):**
 
 ```http
 POST /api/v1/web/littlefarms-appbuilder/location-storefront
 Content-Type: application/json
 
-{"operation":"list","page":1,"pageSize":50,"country":"SG"}
+{"operation":"directory"}
 ```
 
-Optional list filters: `country` (exact ISO code), `city` and `title` (contains, case-insensitive), `isFeatured` (boolean). Results are sorted by Admin **Sort Order**, then **Location ID**.
+Returns `{ "items": [ … ], "total": N }` with General Information fields only (no store hours, map coordinates, or rich content). Disabled locations are omitted. Sorted by Admin **Sort Order**, then **Location ID**. The response is stored in App Builder State (max TTL) until a location **write** or **mass** action clears the cache.
+
+GraphQL **`littleFarmsLocations`** calls this operation and returns the `items` array as `[LittleFarmsLocationGeneral!]!`.
 
 **Get one location** — provide exactly one of `locationId`, `title` (exact, case-insensitive), or `storeUrl`:
 

@@ -55,6 +55,36 @@ function mapWeekHours (source) {
   return hours
 }
 
+function mapLocationGeneral (entry) {
+  if (!entry || entry.locationId == null) return null
+  return {
+    id: String(entry.locationId),
+    locationId: Number(entry.locationId),
+    title: entry.title || '',
+    storeUrl: entry.storeUrl || '',
+    country: entry.country || '',
+    state: entry.state || '',
+    city: entry.city || '',
+    street: entry.street || '',
+    zip: entry.zip || '',
+    phone: entry.phone || '',
+    email: entry.email || '',
+    websiteUrl: entry.websiteUrl || '',
+    openInNewTab: entry.openInNewTab === true,
+    storeViews: Array.isArray(entry.storeViews) ? entry.storeViews.filter(Boolean) : [],
+    storeViewLabel: entry.storeViewLabel || '',
+    description: entry.description || '',
+    sortOrder: entry.sortOrder || '',
+    logo: entry.logo || '',
+    locationImage: entry.locationImage || '',
+    mapMarker: entry.mapMarker || '',
+    metaTitle: entry.metaTitle || '',
+    metaKeywords: entry.metaKeywords || '',
+    metaDescription: entry.metaDescription || '',
+    isFeatured: entry.isFeatured === true
+  }
+}
+
 function mapLocation (entry) {
   if (!entry || entry.locationId == null) return null
   return {
@@ -545,30 +575,15 @@ module.exports = {
         }
       },
       littleFarmsLocations: {
-        resolve: function (_root, args, context) {
+        resolve: function (_root, _args, context) {
           var secrets = secretsFrom(context)
-          var body = { operation: 'list' }
-          if (args.country) body.country = String(args.country).trim()
-          if (args.city) body.city = String(args.city).trim()
-          if (args.title) body.title = String(args.title).trim()
-          if (typeof args.isFeatured === 'boolean') body.isFeatured = args.isFeatured
-          if (args.page != null) body.page = args.page
-          if (args.pageSize != null) body.pageSize = args.pageSize
           return postJson(
             secrets.LITTLEFARMS_LOCATION_STOREFRONT_URL,
             '',
-            body,
+            { operation: 'directory' },
             { skipSecret: true }
           ).then(function (payload) {
-            var pageSize = Number(payload.pageSize) || 50
-            var total = Number(payload.total) || 0
-            return {
-              page: Number(payload.page) || 1,
-              pageSize: pageSize,
-              total: total,
-              pageCount: pageSize > 0 ? Math.ceil(total / pageSize) : 0,
-              items: (payload.items || []).map(mapLocation).filter(Boolean)
-            }
+            return (payload.items || []).map(mapLocationGeneral).filter(Boolean)
           })
         }
       }

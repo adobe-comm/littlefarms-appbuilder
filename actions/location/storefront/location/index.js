@@ -1,6 +1,7 @@
 const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
 const { createLocationStore } = require('../../lib/location-store')
+const { createLocationCache } = require('../../lib/location-cache')
 
 function isWarmPing (params) {
   if (params.warm === true || params.warm === 'true') return true
@@ -66,6 +67,17 @@ async function main (params) {
       return { statusCode: 200, body: { location } }
     }
 
+    if (operation === 'directory') {
+      const cache = await createLocationCache(params)
+      const cached = await cache.getDirectory()
+      if (cached) return { statusCode: 200, body: cached }
+
+      const body = await store.listDirectoryGeneral()
+      await cache.putDirectory(body)
+      logger.info(`Stored location directory (${body.total} enabled)`)
+      return { statusCode: 200, body }
+    }
+
     if (operation === 'list') {
       const page = Math.max(1, Number(params.page) || 1)
       const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 50))
@@ -77,7 +89,7 @@ async function main (params) {
       return { statusCode: 200, body }
     }
 
-    return errorResponse(400, 'operation must be get or list.', logger)
+    return errorResponse(400, 'operation must be get, directory, or list.', logger)
   } catch (error) {
     logger.error(error.message || 'Location storefront read failed.')
     return errorResponse(error.statusCode || 500, error.message || 'Server error.', logger)

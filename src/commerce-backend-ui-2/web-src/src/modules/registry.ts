@@ -33,6 +33,12 @@ export const appModules: AppModuleDefinition[] = [
     available: true,
   },
   {
+    id: "blog",
+    menuLabel: "Blog",
+    pageTitle: "Blog",
+    available: true,
+  },
+  {
     id: "settings",
     menuLabel: "Settings",
     pageTitle: "Settings",

@@ -25,7 +25,7 @@ Browser clients should use this mesh endpoint (with CORS); do not call App Build
 | `littleFarmsBlocks` | Every enabled preset. No arguments. Returns block fields only. SKUs and `products` come from `littleFarmsBlock` |
 | `littleFarmsBrandsList` | Every active brand as `id`, `name`, `slug`, and `image`. Inactive, hidden, and removed brands are left out. The action stores that directory in State until a brand save flushes it |
 | `littleFarmsBrand` / `littleFarmsBrands` | One brand, or one page of full brand records. `littleFarmsBrands` returns `page`, `pageSize`, `total`, `pageCount`, and `items`. It accepts `name`, `isActive`, `isNewBrand`, `isTopBrand`, `isFeatured`, `showInBrandListWidget`, and `showInBrandSliderWidget`. Omit a flag to skip that filter. Omit `isActive` to keep active brands only |
-| `littleFarmsLocation` / `littleFarmsLocations` | One enabled store location, or a paginated list. Lookup by **locationId**, **title** (exact, case-insensitive), or **storeUrl**. List accepts optional `country`, `city`, `title` (contains), and `isFeatured`. Disabled locations are never returned. Sort order follows Admin **Sort Order**, then **Location ID** |
+| `littleFarmsLocation` / `littleFarmsLocations` | **`littleFarmsLocations`** returns every **enabled** location’s **General Information** in one array (no pagination): id, title, store URL, address, contact, store views, description, sort order, logo/images, meta, featured flag. Cached in App Builder State until a location save or mass action. **`littleFarmsLocation`** loads one full record (all sections) by **locationId**, **title**, or **storeUrl** |
 
 See [`schema.graphql`](./schema.graphql) and [`meshConfig.json`](./meshConfig.json) (JsonSchema stub source + programmatic resolvers; no Commerce).
 
@@ -92,29 +92,39 @@ query {
 }
 ```
 
-**Store locator (enabled locations):**
+**Store locator directory (General Information, all enabled):**
 
 ```graphql
 {
-  littleFarmsLocations(country: "SG", page: 1, pageSize: 50) {
-    page
-    total
-    items {
-      locationId
-      title
-      city
-      street
-      latitude
-      longitude
-      phone
-      isFeatured
-      storeHours { monday { open from to } }
-    }
+  littleFarmsLocations {
+    id
+    locationId
+    title
+    storeUrl
+    street
+    state
+    city
+    zip
+    country
+    phone
+    email
+    websiteUrl
+    sortOrder
+    isFeatured
   }
+}
+```
+
+**Single location detail (full record):**
+
+```graphql
+{
   littleFarmsLocation(locationId: 1) {
     title
+    latitude
+    longitude
     storeContent
-    cafeHours { saturday { open from to } }
+    storeHours { monday { open from to } }
   }
 }
 ```

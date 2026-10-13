@@ -113,14 +113,7 @@ extend type Query {
   ): LittleFarmsBrandsPayload!
   littleFarmsBrandsList: [LittleFarmsBrandSummary!]!
   littleFarmsLocation(locationId: Int, title: String, storeUrl: String): LittleFarmsLocation
-  littleFarmsLocations(
-    country: String
-    city: String
-    title: String
-    isFeatured: Boolean
-    page: Int
-    pageSize: Int
-  ): LittleFarmsLocationsPayload!
+  littleFarmsLocations: [LittleFarmsLocationGeneral!]!
 }
 
 type LittleFarmsBrandsPayload {
@@ -226,10 +219,29 @@ type LittleFarmsLocation {
   cafeHours: LittleFarmsWeekHours!
 }
 
-type LittleFarmsLocationsPayload {
-  page: Int!
-  pageSize: Int!
-  total: Int!
-  pageCount: Int!
-  items: [LittleFarmsLocation!]!
+type LittleFarmsLocationGeneral {
+  id: ID!
+  locationId: Int!
+  title: String!
+  storeUrl: String
+  country: String
+  state: String
+  city: String
+  street: String
+  zip: String
+  phone: String
+  email: String
+  websiteUrl: String
+  openInNewTab: Boolean!
+  storeViews: [String!]!
+  storeViewLabel: String
+  description: String
+  sortOrder: String
+  logo: String
+  locationImage: String
+  mapMarker: String
+  metaTitle: String
+  metaKeywords: String
+  metaDescription: String
+  isFeatured: Boolean!
 }

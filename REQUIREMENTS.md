@@ -12,9 +12,9 @@
 | **Extension Name** | Little Farms Admin |
 | **App metadata id** | `littlefarms-blocks` |
 | **App metadata version** | 1.0.2 |
-| **Requirements doc version** | 1.9 |
+| **Requirements doc version** | 2.1 |
 | **Status** | in-development |
-| **Last Updated** | 2026-10-05 |
+| **Last Updated** | 2026-10-13 |
 | **Product Manager** | Product Manager Agent |
 | **Stakeholders** | Little Farms merchandising, storefront / EDS engineering |
 
@@ -28,7 +28,9 @@
 
 **Currently implemented (v1):** the **Blocks** module—typed content and merchandising blocks (featured/recommended product carousels, brand lists, PDP placement rules). Storefront and EDS consume **Blocks** output through **API Mesh GraphQL** (`littleFarmsBlock` / `littleFarmsBlocks`); external docs may describe this surface as *product recommendation*, but that is **one feature area**, not the whole app.
 
-**Next module (in requirements):** **Brands** — brand records, a merchant-selected product dropdown attribute (no preset attribute code), Admin brand management, and storefront brand pages (PLP, PDP, widgets). It registers on the same Admin shell (`AppShell` module rail) with its own actions, database, file, and state storage, plus an API Mesh contract.
+**Shipped / in progress:** **Brands** and **Locations** on the same Admin shell (`AppShell` module rail).
+
+**Next module (in requirements):** **Blog** — replace Aheadworks Blog admin for **categories**, **tags**, and **posts** on SaaS. Merchants want **two separate Commerce Admin menus** (not one shell with two rail items): **Blog Categories** and **Blogs** (posts). Admin UI SDK V2 allows **one menu item per App Builder application**, so categories and posts are **two deployable apps** (shared database and naming conventions are an implementation choice in Phase 2).
 
 The app delivers shared runtime infrastructure (condition engine where needed, Admin SPA, App Builder actions, database persistence, Commerce catalog integration, caching).
 
@@ -69,7 +71,10 @@ The app delivers shared runtime infrastructure (condition engine where needed, A
 | Module | Status | Admin entry | Storefront |
 |--------|--------|-------------|------------|
 | **Blocks** (content + recommendation carousels, brands list, PDP rules) | **Shipped (v1)** | MainPage / block list & editor | API Mesh GraphQL + `block-storefront` / `block-evaluate` |
-| **Brands** | **Phase 3 Option A** | AppShell rail → Brand Management | API Mesh GraphQL (by id, name, or URL alias) |
+| **Brands** | **Shipped / in progress** | AppShell rail → Brands | API Mesh GraphQL (by id, name, or URL alias) |
+| **Locations** | **Shipped / in progress** | AppShell rail → Locations | TBD |
+| **Blog — Categories** | **Phase 1 complete ✅** | **Separate Commerce menu** → Blog Categories app | API Mesh GraphQL (Phase 2) |
+| **Blog — Posts** | **Phase 1 complete ✅** | **Separate Commerce menu** → Blogs app | API Mesh GraphQL (Phase 2) |
 
 ### Constraints
 
@@ -206,6 +211,211 @@ Type registry drives admin forms; v1 ships Featured/Recommended and Brands List;
 ### FR-9: Brands module
 
 See **Brands module** below. **Brands Phase 1: Complete ✅** (2026-10-05). **Brands Phase 2: Approved ✅** (2026-10-05). **Phase 3: Implementation Approach Selected: Option A.**
+
+### FR-10: Blog — category listing and CRUD (separate Admin menu)
+
+Merchants open **Blog Categories** (dedicated Commerce menu → App Builder **App 1**). They must have a **category listing grid** (search/filter, pagination, **Add Category**) and full **CRUD**: create, edit, delete categories via a dedicated edit screen. Data persists in App Builder Database. Categories are assigned to posts via multiselect (post stores `category_ids`).
+
+### FR-11: Blog — tag listing and CRUD (inside posts app)
+
+Merchants open **Blogs** (App Builder **App 2**). In addition to posts, they must have a **tag listing grid** and full **CRUD** (create, edit, delete) on dedicated tag screens—not tags managed only inline on the post form. Tags do **not** get a third Commerce menu in v1.
+
+### FR-12: Blog — post listing and CRUD (separate Admin menu)
+
+Merchants manage **posts** in App 2: **post listing grid** plus create/edit/delete on the **Edit Post** screen (fields per **Blog module**). Posts store **category ids** and **tag ids** only for related entities (no Authors, Comments, or Mail Log in App Builder). Category and tag pickers on the post form load options from the listing APIs (same collections).
+
+---
+
+## Blog module
+
+**Status:** **Blog Phase 1: Complete ✅** (2026-10-13). Phase 2 architecture (two-app layout, collections, GraphQL, ACL) not started.
+
+**Reference UI:** Aheadworks Blog on PaaS — **Posts** edit screen (screenshots, Oct 2026). Scope is narrowed to **Category**, **Tag**, and **Post** data in App Builder.
+
+**Platform:** SaaS (ACCS). IMS mandatory on admin write actions. Checkout webhooks are out of scope.
+
+### Admin entry (product decision)
+
+| Surface | Commerce Admin | App Builder |
+|---------|----------------|-------------|
+| **Blog Categories** | Its own menu item (e.g. **Blog Categories**) | **App 1** — **Categories** listing grid + category create/edit/delete |
+| **Blogs (posts)** | Its own menu item (e.g. **Blogs** or **Posts**) | **App 2** — in-app nav: **Posts** and **Tags**, each with listing grid + full CRUD |
+| **Little Farms Admin** | Existing **Apps → Little Farms Admin** | Unchanged; Blocks, Brands, Locations stay on the module rail |
+
+[V2 menu](https://developer.adobe.com/commerce/extensibility/admin-ui-sdk/extension-points/v2/menu): one `adminUi.menu` per application. Two Commerce menus ⇒ two App Builder apps. Apps may share one workspace database (same collections) and reuse action/lib patterns from this repo.
+
+### In scope (v1)
+
+- **Category** — listing grid + create/edit/delete screens in App 1.
+- **Tag** — listing grid + create/edit/delete screens in App 2 (dedicated **Tags** section, not post-form-only).
+- **Post** — listing grid + create/edit/delete in App 2; post form multiselects for categories and tags fed from list APIs.
+- Image uploads for post media (Files + URL on document), same pattern as Brands/Locations.
+- Post ↔ category and post ↔ tag relationships (`category_ids`, `tag_ids` on the post document).
+
+### Admin surfaces (listing + CRUD)
+
+Follow existing Little Farms Admin patterns where applicable (Brands grid: filters, pagination, row **Edit**, primary **Add** action). Each app is a standalone Admin UI SPA (not the Little Farms Admin module rail).
+
+**App 1 — Blog Categories**
+
+| Screen | Behavior |
+|--------|----------|
+| **Categories listing** | Default landing after opening the Commerce menu. Columns (minimum): **Title**, **URL Key**, **Status** (active/inactive), **Sort Order**, **Updated**, **Actions** (Edit, Delete). Toolbar: **Add Category**, search/filter, pagination. |
+| **Add / Edit category** | Form for all **Category document** fields. Actions: Back, Delete (edit only), Save, Save and Continue Edit. Auto-suggest `url_key` from title; enforce unique `url_key`. Confirm before delete if posts still reference the category (Phase 2 rule; v1 may block delete or warn). |
+
+**App 2 — Blogs**
+
+| Screen | Behavior |
+|--------|----------|
+| **In-app navigation** | Left or top nav with at least **Posts** and **Tags** (Aheadworks-style split; no Authors/Comments menus). |
+| **Posts listing** | Columns (minimum): **Title**, **URL Key**, **Status**, **Publish at**, **Categories** (labels), **Tags** (labels), **Updated**, **Actions** (Edit, Delete). Toolbar: **Add Post**, filters (status, category), pagination. |
+| **Add / Edit post** | Full **Post document** + image uploads. Category and tag fields are multiselects populated from `category-list` / `tag-list` (read-only pickers; CRUD stays on category/tag screens). |
+| **Tags listing** | Columns (minimum): **Title**, **URL Key**, **Status**, **Updated**, **Actions** (Edit, Delete). Toolbar: **Add Tag**, search, pagination. |
+| **Add / Edit tag** | Form for all **Tag document** fields. Actions: Back, Delete (edit only), Save, Save and Continue Edit. Unique `url_key`. |
+
+### Runtime actions (proposed, admin)
+
+| Action | App | Purpose |
+|--------|-----|---------|
+| `blog-category-list` | 1 | Paginated listing + optional filters for Admin grid and post multiselect |
+| `blog-category-write` | 1 | Create/update category |
+| `blog-category-remove` | 1 | Delete category |
+| `blog-tag-list` | 2 | Paginated listing for Tags grid and post multiselect |
+| `blog-tag-write` | 2 | Create/update tag |
+| `blog-tag-remove` | 2 | Delete tag |
+| `blog-post-list` | 2 | Paginated post grid |
+| `blog-post-write` | 2 | Create/update post (including `category_ids`, `tag_ids`) |
+| `blog-post-remove` | 2 | Delete post |
+| `blog-post-asset` | 2 | Image upload to Files (optional separate action; same pattern as `brand-asset`) |
+
+All admin actions: `require-adobe-auth: true`, IMS credentials where Database is used.
+
+### Out of scope (v1)
+
+Aheadworks menus and features **not** modeled in App Builder:
+
+| Aheadworks area | Decision |
+|-----------------|----------|
+| **Authors** | Out of scope — no author entity or post author picker |
+| **Disqus Comments / Built-in Comments / Mail Log** | Out of scope — no comment storage or mail log |
+| **Go To Comments**, **Allow Comments** (as a comment system) | Out of scope — omit or hard-code storefront default in Phase 2 if needed |
+| **Author Badge**, **Display author(s)**, **Twitter site account** | Out of scope |
+| Global **Config Settings** (“use default from config”) | Out of scope — no shared blog config document in v1 |
+
+**Customer groups** on the reference post form (**Enable post for customer groups**) may be Phase 2 if storefront needs visibility rules; not a separate App Builder “record type.” Default for Phase 1 documentation: **defer** unless stakeholders require parity.
+
+### Category document (minimal v1)
+
+Collection name: **`littlefarms_blog_categories`** (proposed; confirm in Phase 2).
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | string | Yes | Stable document id |
+| `title` | string | Yes | Display name (e.g. **Stories**) |
+| `url_key` | string | Yes | Unique slug for storefront URLs |
+| `is_active` | boolean | No | Default `true` |
+| `sort_order` | integer | No | Grid ordering |
+| `meta_title` | string | No | |
+| `meta_keywords` | string | No | |
+| `meta_description` | string | No | |
+| `createdAt` / `updatedAt` | string | Yes | ISO timestamps |
+
+Category edit screens on PaaS were not captured in screenshots; fields above are the minimum for post assignment and storefront listing. Add parent category or description in Phase 2 if required.
+
+### Tag document (minimal v1)
+
+Collection: **`littlefarms_blog_tags`** (proposed).
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | string | Yes | |
+| `title` | string | Yes | |
+| `url_key` | string | Yes | Unique slug |
+| `is_active` | boolean | No | Default `true` |
+| `createdAt` / `updatedAt` | string | Yes | |
+
+### Post document (from Edit Post reference)
+
+Collection: **`littlefarms_blog_posts`** (proposed).
+
+**Identity and content**
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `title` | string | Yes | |
+| `url_key` | string | Yes | Unique slug |
+| `short_content` | text/html | No | Checkbox “Short Content” on reference |
+| `content` | html | Yes | Rich text (HugeRTE-class editor in Admin) |
+| `featured_products_widget` | boolean | No | |
+| `recommended_products_widget` | boolean | No | |
+
+**Images** (Files storage; URL + alt on document)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `featured_image` | string (URL) | Reference suggests 500×500 |
+| `mobile_image` | string (URL) | Reference suggests 500×300 |
+| `featured_image_title` | string | Labeled “Image Title” on reference |
+| `featured_image_alt` | string | |
+| `featured_image_link` | string (URL) | Full content page link |
+| `listing_image` | string (URL) | |
+| `listing_image_title` | string | |
+| `listing_image_alt` | string | |
+
+**Publishing**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `status` | enum | e.g. `draft`, `published` — supports Save as Draft / Update Post |
+| `publish_at` | string (datetime) | |
+| `end_at` | string (datetime) | Optional unpublish |
+| `is_featured` | boolean | |
+| `is_recipe` | boolean | |
+
+**Relations (App Builder entities only)**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `category_ids` | string[] | Multiselect; e.g. **Stories** |
+| `tag_ids` | string[] | Multiselect |
+
+**SEO**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `meta_title` | string | Recommended 50–60 chars (UI hint) |
+| `meta_keywords` | string | Recommended 50–60 chars on reference |
+| `meta_description` | string | Recommended 50–160 chars |
+| `meta_prefix` | string | |
+| `meta_suffix` | string | |
+
+**Admin actions (reference parity)**
+
+List/grid plus edit actions: Back, Delete, Preview, Save as Draft, Save as draft & Duplicate, Save and Continue Edit, Update Post. Preview URL rules and storefront routing are Phase 2.
+
+### Storage (proposed)
+
+| Data | Service |
+|------|---------|
+| Categories, tags, posts | **Database** (`aio-lib-db`) |
+| Post images | **Files** (`aio-lib-files`) under e.g. `public/blog/...` |
+| Storefront read cache | **State** (TTL TBD in Phase 2) |
+
+### Storefront
+
+API Mesh GraphQL for category list, post by `url_key`, post lists filtered by category/tag — **Phase 2**. Contract doc TBD (similar to `docs/storefront-contract.md`).
+
+### Testing
+
+Recommendations only unless requested: create category in App 1, tag + post in App 2, assign **Stories**-style category, verify slug uniqueness, draft vs published.
+
+### Phase markers
+
+| Phase | Status |
+|-------|--------|
+| Phase 1 — requirements | **Complete ✅** (2026-10-13) |
+| Phase 2 — architecture | Not started |
+| Phase 3 — implementation approach | Not started |
 
 ---
 
@@ -377,6 +587,9 @@ Full design: **`ARCHITECTURE.md` → Brands module**. Approved 2026-10-05.
 | Brand collection | **`littlefarms_brands`** |
 | Brand attribute code | Merchant-selected dropdown. No default (`if_brand` was an example only) |
 | Brand attribute change | Hide previous brands; restore when that attribute is selected again |
+| Blog admin menus | **Two App Builder apps** — Blog Categories menu + Blogs (posts) menu; not modules on Little Farms Admin rail |
+| Blog related records | **Category** and **Tag** only in App Builder; Authors and Comments out of scope v1 |
+| Blog collections (proposed) | **`littlefarms_blog_categories`**, **`littlefarms_blog_tags`**, **`littlefarms_blog_posts`** |
 | Concepts | `docs/blocks-concepts.md` |
 
 ---
@@ -412,6 +625,20 @@ Full design: **`ARCHITECTURE.md` → Brands module**. Approved 2026-10-05.
 
 - [x] Phase 1: Complete ✅
 
+**Blog module (Phase 1 complete, not built)**
+
+- [ ] Two App Builder applications registered with separate Commerce Admin menus (categories vs posts)
+- [ ] **Categories:** listing grid + Add/Edit/Delete screens (App 1)
+- [ ] **Tags:** listing grid + Add/Edit/Delete screens (App 2, **Tags** nav item)
+- [ ] **Posts:** listing grid + Edit Post screen per **Blog module** (App 2, **Posts** nav item)
+- [ ] Post multiselects for categories/tags use list APIs; CRUD remains on category/tag screens
+- [ ] Post stores `category_ids` and `tag_ids` only (no authors/comments)
+- [ ] Post images in File storage
+- [ ] Admin actions: category/tag/post list, write, remove (+ post asset)
+- [ ] Storefront GraphQL contract and mesh resolvers (Phase 2)
+
+- [x] Blog Phase 1: Complete ✅ (2026-10-13)
+
 ---
 
 ## Change Log
@@ -429,3 +656,5 @@ Full design: **`ARCHITECTURE.md` → Brands module**. Approved 2026-10-05.
 | 1.7 | 2026-10-05 | Agent | Brands Phase 2 draft in `ARCHITECTURE.md`. No checkout webhook |
 | 1.8 | 2026-10-05 | Agent | Brands Phase 2 architecture approved |
 | 1.9 | 2026-10-05 | Agent | Phase 3 Option A. Implementation plan and starter-kit discovery recorded |
+| 2.0 | 2026-10-13 | Agent | **Blog module** Phase 1: two Commerce menus (two apps), Category/Tag/Post field model from Aheadworks Edit Post screenshots; Authors/Comments out of scope; FR-10–FR-12 |
+| 2.1 | 2026-10-13 | Agent | Blog: explicit **listing + CRUD screens** for categories (App 1) and tags (App 2); posts listing; proposed admin actions; in-app Posts/Tags nav |

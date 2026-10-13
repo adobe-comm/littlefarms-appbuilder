@@ -205,6 +205,13 @@ function categoryListQuery (page = 1) {
   return params
 }
 
+function customerGroupsQuery (page = 1) {
+  const params = new URLSearchParams()
+  params.set('searchCriteria[pageSize]', '100')
+  params.set('searchCriteria[currentPage]', String(Math.max(1, Number(page) || 1)))
+  return params
+}
+
 function addBrowseFilter (params, group, field, value, conditionType) {
   if (!value) return group
   const prefix = `searchCriteria[filterGroups][${group}][filters][0]`
@@ -551,6 +558,26 @@ function createAttributeCatalog (params, dependencies = {}) {
       return [...products.values()]
         .sort((left, right) => String(left.sku).localeCompare(String(right.sku), undefined, { numeric: true }))
         .slice(0, displayLimit(rule))
+    },
+    async listCustomerGroups () {
+      const payload = await restGet(restCatalogUrl(params, 'customerGroups/search', customerGroupsQuery()))
+      const fromApi = (payload.items || [])
+        .filter(group => group?.id != null)
+        .map(group => ({
+          id: String(group.id),
+          label: String(group.code || group.id).trim() || String(group.id)
+        }))
+      const byId = new Map(fromApi.map(group => [group.id, group]))
+      if (!byId.has('0')) {
+        byId.set('0', { id: '0', label: 'NOT LOGGED IN' })
+      }
+      const sorted = [...byId.values()].sort((left, right) => {
+        const leftNum = Number(left.id)
+        const rightNum = Number(right.id)
+        if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) return leftNum - rightNum
+        return left.label.localeCompare(right.label)
+      })
+      return [{ id: 'all', label: 'All Groups' }, ...sorted]
     }
   }
 }

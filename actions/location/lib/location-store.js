@@ -81,6 +81,36 @@ function publicLocation (doc) {
   }
 }
 
+/** General Information fields for storefront directory (enabled locations only). */
+function generalStorefront (doc) {
+  const form = toForm(doc)
+  return {
+    locationId: form.locationId,
+    title: form.title,
+    storeUrl: form.storeUrl,
+    country: form.country,
+    state: form.state,
+    city: form.city,
+    street: form.street,
+    zip: form.zip,
+    phone: form.phone,
+    email: form.email,
+    websiteUrl: form.websiteUrl,
+    openInNewTab: form.openInNewTab,
+    storeViews: form.storeViews,
+    storeViewLabel: viewLabel(doc),
+    description: form.description,
+    sortOrder: form.sortOrder,
+    logo: form.logo,
+    locationImage: form.locationImage,
+    mapMarker: form.mapMarker,
+    metaTitle: form.metaTitle,
+    metaKeywords: form.metaKeywords,
+    metaDescription: form.metaDescription,
+    isFeatured: form.isFeatured
+  }
+}
+
 function isEnabledLocation (doc) {
   return doc && doc.status !== 'disabled'
 }
@@ -418,6 +448,12 @@ function createLocationStore (params, opener = openLocationDb) {
       }
     },
 
+    async listDirectoryGeneral () {
+      const docs = await loadAll()
+      const items = docs.filter(doc => isEnabledLocation(doc)).sort(sortStorefront).map(generalStorefront)
+      return { items, total: items.length }
+    },
+
     async save (fields, locationId) {
       const record = sanitizeLocation(fields)
       const now = new Date().toISOString()
@@ -481,5 +517,6 @@ function createLocationStore (params, opener = openLocationDb) {
 module.exports = {
   ALL_STORE_VIEWS,
   STORE_VIEWS,
+  generalStorefront,
   createLocationStore
 }

@@ -71,6 +71,61 @@ body {
   box-shadow: inset 3px 0 0 #eb5202;
 }
 
+.lf-blog-header h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.lf-blog-intro {
+  margin: 0 0 16px;
+  color: #666;
+  max-width: 42rem;
+}
+
+.lf-blog-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.admin-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.admin-filter-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.lf-blog-nav .lf-module-link {
+  border-radius: 4px;
+}
+
+.lf-blog-panel {
+  min-height: 12rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .lf-section-layout-header {
   display: flex;
   align-items: center;

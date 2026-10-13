@@ -290,6 +290,129 @@ runtimeManifest:
             memorySize: 256
           annotations:
             <<: *admin-annotations
+        blog-post-list:
+          function: ../../actions/blog/admin/post-list/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        blog-post-write:
+          function: ../../actions/blog/admin/post-write/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        blog-post-mass:
+          function: ../../actions/blog/admin/post-mass/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        blog-post-asset:
+          function: ../../actions/blog/admin/post-asset/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 20000
+            memorySize: 512
+          annotations:
+            <<: *admin-annotations
+        blog-customer-groups:
+          function: ../../actions/blog/admin/customer-groups/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 15000
+            memorySize: 256
+          annotations:
+            <<: *admin-annotations
+        blog-category-list:
+          function: ../../actions/blog/admin/category-list/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        blog-category-write:
+          function: ../../actions/blog/admin/category-write/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        blog-category-mass:
+          function: ../../actions/blog/admin/category-mass/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        blog-category-asset:
+          function: ../../actions/blog/admin/category-asset/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 20000
+            memorySize: 512
+          annotations:
+            <<: *admin-annotations
+        blog-tag-list:
+          function: ../../actions/blog/admin/tag-list/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        blog-tag-write:
+          function: ../../actions/blog/admin/tag-write/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        blog-tag-mass:
+          function: ../../actions/blog/admin/tag-mass/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
         location-storefront:
           function: ../../actions/location/storefront/location/index.js
           web: yes
