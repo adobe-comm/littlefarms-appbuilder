@@ -51,10 +51,13 @@ jobs:
           AIO_RUNTIME_AUTH: ${{ secrets.AIO_RUNTIME_AUTH }}
           AIO_PROJECT_ID: ${{ secrets.AIO_PROJECT_ID }}
           AIO_PROJECT_NAME: ${{ secrets.AIO_PROJECT_NAME }}
+          AIO_PROJECT_TITLE: ${{ secrets.AIO_PROJECT_TITLE }}
           AIO_PROJECT_ORG_ID: ${{ secrets.AIO_PROJECT_ORG_ID }}
+          AIO_PROJECT_ORG_NAME: ${{ secrets.AIO_PROJECT_ORG_NAME }}
           AIO_PROJECT_ORG_IMS__ORG__ID: ${{ secrets.IMSORGID }}
           AIO_PROJECT_WORKSPACE_ID: ${{ secrets.AIO_PROJECT_WORKSPACE_ID }}
           AIO_PROJECT_WORKSPACE_NAME: ${{ secrets.AIO_PROJECT_WORKSPACE_NAME }}
+          AIO_PROJECT_WORKSPACE_TITLE: ${{ secrets.AIO_PROJECT_WORKSPACE_NAME }}
           AIO_PROJECT_WORKSPACE_DETAILS_SERVICES: ${{ secrets.AIO_PROJECT_WORKSPACE_DETAILS_SERVICES }}
         uses: adobe/aio-apps-action@4.1.0
         with:

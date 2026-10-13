@@ -29,9 +29,12 @@ main (){
     echo "AIO_RUNTIME_AUTH:             $(echo "$config" | jq -r '.runtime.auth')"
     echo "AIO_PROJECT_ID:               $(echo "$config" | jq -r '.project.id')"
     echo "AIO_PROJECT_NAME:             $(echo "$config" | jq -r '.project.name')"
+    echo "AIO_PROJECT_TITLE:            $(echo "$config" | jq -r '.project.title')"
     echo "AIO_PROJECT_ORG_ID:           $(echo "$config" | jq -r '.project.org.id')"
+    echo "AIO_PROJECT_ORG_NAME:         $(echo "$config" | jq -r '.project.org.name')"
     echo "AIO_PROJECT_WORKSPACE_ID:     $(echo "$config" | jq -r '.project.workspace.id')"
     echo "AIO_PROJECT_WORKSPACE_NAME:   $(echo "$config" | jq -r '.project.workspace.name')"
+    echo "AIO_PROJECT_WORKSPACE_TITLE:  $(echo "$config" | jq -r '.project.workspace.title')"
     echo "AIO_PROJECT_WORKSPACE_DETAILS_SERVICES:   $(echo "$config" | jq -r -c '.project.workspace.details.services')"
 }
 
