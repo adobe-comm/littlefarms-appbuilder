@@ -127,6 +127,15 @@ function App() {
   const [activeModuleId, setActiveModuleId] = useState(readStoredModuleId);
 
   useEffect(() => {
+    const embedClass = "lf-embed";
+    const embedded = host === "commerce-ui" || host === "shell";
+    if (embedded) {
+      document.documentElement.classList.add(embedClass);
+    }
+    return () => document.documentElement.classList.remove(embedClass);
+  }, [host]);
+
+  useEffect(() => {
     writeModuleRoute(activeModuleId);
   }, [activeModuleId]);
 

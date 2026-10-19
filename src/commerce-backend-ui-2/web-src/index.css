@@ -4,6 +4,37 @@ body {
   font-family: adobe-clean, Arial, sans-serif;
 }
 
+/* Commerce Admin / Experience Cloud embed: one scroll region, not 100vh + host scroll */
+html.lf-embed,
+html.lf-embed body,
+html.lf-embed #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+html.lf-embed .lf-app-shell {
+  min-height: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+html.lf-embed .lf-module-rail {
+  min-height: 100%;
+}
+
+html.lf-embed .lf-app-main {
+  min-height: 0;
+  overflow: auto;
+}
+
+html.lf-embed .conditional-blocks {
+  min-height: auto;
+}
+
+html.lf-embed .block-edit-page .lf-section-layout-body {
+  min-height: auto;
+}
+
 .conditional-blocks {
   padding: 24px;
   min-height: 100vh;

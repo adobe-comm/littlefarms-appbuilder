@@ -7,13 +7,13 @@ const REPO_ROOT = path.resolve(__dirname, '../../..')
 
 function resolveBrandAssetActionFqn () {
   const pkg = String(process.env.AIO_RUNTIME_PACKAGE || 'littlefarms-appbuilder').trim()
-  const action = String(process.env.BRAND_ASSET_ACTION || '__secured_brand-asset').trim()
+  const action = String(process.env.BRAND_ASSET_ACTION || '__secured_brand-admin').trim()
   return `${pkg}/${action}`
 }
 
 function resolveLocationAssetActionFqn () {
   const pkg = String(process.env.AIO_RUNTIME_PACKAGE || 'littlefarms-appbuilder').trim()
-  const action = String(process.env.LOCATION_ASSET_ACTION || '__secured_location-asset').trim()
+  const action = String(process.env.LOCATION_ASSET_ACTION || '__secured_location-admin').trim()
   return `${pkg}/${action}`
 }
 
@@ -63,6 +63,7 @@ function invokeBrandAssetUpload ({
   buffer
 }) {
   const activation = invokeRuntimeAction(resolveBrandAssetActionFqn(), {
+    adminOperation: 'asset',
     attributeCode,
     optionValue,
     kind,
@@ -89,6 +90,7 @@ function invokeLocationAssetUpload ({
   contentId
 }) {
   const params = {
+    adminOperation: 'asset',
     locationKey,
     kind,
     contentType,
