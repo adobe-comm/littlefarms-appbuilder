@@ -71,6 +71,10 @@ async function findOneOrNull (collection, filter) {
   }
 }
 
+function scopeQuery (presetScope) {
+  return { 'scope.storeViewCode': presetScope.storeViewCode }
+}
+
 function createPresetStore (params, opener = openCollection) {
   async function withCollection (callback) {
     const { client, collection } = await opener(params)
@@ -91,8 +95,7 @@ function createPresetStore (params, opener = openCollection) {
       const presetScope = scope()
       if (/^\d+$/.test(raw)) {
         return findOneOrNull(collection, {
-          'scope.environmentId': presetScope.environmentId,
-          'scope.storeViewCode': presetScope.storeViewCode,
+          ...scopeQuery(presetScope),
           blockId: Number(raw)
         })
       }
@@ -101,14 +104,12 @@ function createPresetStore (params, opener = openCollection) {
       return findOneOrNull(collection, { legacyUuid: raw })
     }),
     findByName: (presetScope, normalizedName) => withCollection(collection => findOneOrNull(collection, {
-      'scope.environmentId': presetScope.environmentId,
-      'scope.storeViewCode': presetScope.storeViewCode,
+      ...scopeQuery(presetScope),
       normalizedName: normalizePresetName(normalizedName)
     })),
     findByTitle: (presetScope, title) =>
       withCollection(collection => findOneOrNull(collection, {
-        'scope.environmentId': presetScope.environmentId,
-        'scope.storeViewCode': presetScope.storeViewCode,
+        ...scopeQuery(presetScope),
         normalizedName: normalizePresetName(title)
       })),
     findByBlockId: (presetScope, blockId) => {
@@ -117,16 +118,12 @@ function createPresetStore (params, opener = openCollection) {
         return Promise.resolve(null)
       }
       return withCollection(collection => findOneOrNull(collection, {
-        'scope.environmentId': presetScope.environmentId,
-        'scope.storeViewCode': presetScope.storeViewCode,
+        ...scopeQuery(presetScope),
         blockId: value
       }))
     },
     list: presetScope => withCollection(async collection => {
-      const cursor = collection.find({
-        'scope.environmentId': presetScope.environmentId,
-        'scope.storeViewCode': presetScope.storeViewCode
-      })
+      const cursor = collection.find(scopeQuery(presetScope))
       return cursor.sort({ updatedAt: -1, blockId: 1, name: 1 }).toArray()
     }),
     insert: preset => withCollection(async collection => {
@@ -137,7 +134,6 @@ function createPresetStore (params, opener = openCollection) {
       const filter = Number.isInteger(preset.blockId)
         ? {
             blockId: preset.blockId,
-            'scope.environmentId': preset.scope.environmentId,
             'scope.storeViewCode': preset.scope.storeViewCode
           }
         : { id: preset.id }
@@ -160,16 +156,14 @@ function createPresetStore (params, opener = openCollection) {
       let existing = null
       if (/^\d+$/.test(raw)) {
         existing = await findOneOrNull(collection, {
-          'scope.environmentId': presetScope.environmentId,
-          'scope.storeViewCode': presetScope.storeViewCode,
+          ...scopeQuery(presetScope),
           blockId: Number(raw)
         })
       } else {
         existing = await findOneOrNull(collection, { id: raw })
         if (!existing) {
           existing = await findOneOrNull(collection, {
-            'scope.environmentId': presetScope.environmentId,
-            'scope.storeViewCode': presetScope.storeViewCode,
+            ...scopeQuery(presetScope),
             legacyUuid: raw
           })
         }
@@ -183,8 +177,7 @@ function createPresetStore (params, opener = openCollection) {
       const filter = Number.isInteger(blockId) && blockId > 0
         ? {
             blockId,
-            'scope.environmentId': presetScope.environmentId,
-            'scope.storeViewCode': presetScope.storeViewCode
+            ...scopeQuery(presetScope)
           }
         : { id: existing.id }
       const result = await collection.deleteOne(filter)
@@ -196,10 +189,7 @@ function createPresetStore (params, opener = openCollection) {
       return { id: blockId != null ? String(blockId) : String(existing.id) }
     }),
     nextBlockId: presetScope => withCollection(async collection => {
-      const cursor = collection.find({
-        'scope.environmentId': presetScope.environmentId,
-        'scope.storeViewCode': presetScope.storeViewCode
-      })
+      const cursor = collection.find(scopeQuery(presetScope))
       const presets = await cursor.toArray()
       return presets.reduce((max, preset) => Math.max(max, readBlockId(preset) || 0), 0) + 1
     })

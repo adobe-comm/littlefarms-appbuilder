@@ -1,6 +1,6 @@
 # API Mesh — Little Farms Blocks (REST → GraphQL)
 
-This mesh exposes Little Farms **blocks**, **brands**, and **store locations** App Builder actions as GraphQL. It does **not** include Adobe Commerce catalog in the schema for now. EDS can call a dedicated mesh endpoint for `littleFarmsBlock`, `littleFarmsBrand`, `littleFarmsLocation`, and related fields; Commerce `products` queries stay on the Commerce GraphQL endpoint (or a separate mesh you add later).
+This mesh exposes Little Farms **blocks**, **brands**, **store locations**, and **blog** App Builder actions as GraphQL. It does **not** include Adobe Commerce catalog in the schema for now. EDS can call a dedicated mesh endpoint for `littleFarmsBlock`, `littleFarmsBrand`, `littleFarmsLocation`, and related fields; Commerce `products` queries stay on the Commerce GraphQL endpoint (or a separate mesh you add later).
 
 ## Architecture
 
@@ -11,6 +11,7 @@ EDS / server
             → block-storefront (presets: list / get)
             → brand-storefront (brands: list / get / directory)
             → location-storefront (locations: list / get)
+            → blog-storefront (posts / categories / visits)
 ```
 
 **Preset list/get** is public on `block-storefront` (no shared secret). `littleFarmsBlocks` takes no arguments and returns every enabled preset.
@@ -26,6 +27,12 @@ Browser clients should use this mesh endpoint (with CORS); do not call App Build
 | `littleFarmsBrandsList` | Every active brand as `id`, `name`, `slug`, and `image`. Inactive, hidden, and removed brands are left out. The action stores that directory in State until a brand save flushes it |
 | `littleFarmsBrand` / `littleFarmsBrands` | One brand, or one page of full brand records. `littleFarmsBrands` returns `page`, `pageSize`, `total`, `pageCount`, and `items`. It accepts `name`, `isActive`, `isNewBrand`, `isTopBrand`, `isFeatured`, `showInBrandListWidget`, and `showInBrandSliderWidget`. Omit a flag to skip that filter. Omit `isActive` to keep active brands only |
 | `littleFarmsLocation` / `littleFarmsLocations` | **`littleFarmsLocations`** returns every **enabled** location’s **General Information** in one array (no pagination): id, title, store URL, address, contact, store views, description, sort order, logo/images, meta, featured flag. Cached in App Builder State until a location save or mass action. **`littleFarmsLocation`** loads one full record (all sections) by **locationId**, **title**, or **storeUrl** |
+| `littleFarmsBlogPosts` | Paginated blog summaries (`page`, `pageSize`, optional category/tag/featured/recipe/customer-group filters) |
+| `littleFarmsBlogPostsByCategory` | Paginated posts for one category (`categoryId` or `categoryUrlKey`) |
+| `littleFarmsBlogPost` | Full post by `postId` or `urlKey` |
+| `littleFarmsBlogCategories` | Enabled categories with image and sort order |
+| `littleFarmsMostReadBlogPosts` | Top posts by view count (`limit`, optional filters) |
+| `littleFarmsRecordBlogVisit` | **Mutation**: increment view count (`postId` or `urlKey`). Requires mesh config stub `lfMeshStubMutation` (see `meshConfig.json`). |
 
 See [`schema.graphql`](./schema.graphql) and [`meshConfig.json`](./meshConfig.json) (JsonSchema stub source + programmatic resolvers; no Commerce).
 
@@ -131,11 +138,27 @@ query {
 
 ## Response cache
 
-`meshConfig.responseConfig.cache` is `true`, and the mesh response sets `Cache-Control: public, max-age=300` ([Caching](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/), [cache-control headers](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/cache-control-headers/)). A repeated identical GraphQL request can be served from the mesh for 5 minutes. The cache key is the whole request, so a different `blockId` or different arguments is a different entry. There is no per-query or per-id setting.
+`meshConfig.responseConfig.cache` is `true`, and the mesh response sets:
 
-A brand or block save does not clear one entry. `aio api-mesh:cache:purge -a` clears every cached response for this mesh. After a mesh update that changes cached data, purge before measuring again.
+`Cache-Control: public, max-age=60, stale-while-revalidate=60, stale-if-error=300`
 
-Check the HTTP headers `Cache-Status` (`HIT` or `MISS`) and `Age`. The first call after expiry is still a miss and still runs the App Builder action.
+([Caching](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/), [cache-control headers](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/cache-control-headers/)).
+
+| Directive | Value | Role |
+|-----------|-------|------|
+| `max-age` | **60** | Fresh cache for 1 minute (was 300). Shorter fresh window so Mesh revalidates sooner while App Builder State still holds block/SKU data. |
+| `stale-while-revalidate` | **60** | After `max-age`, Mesh may return stale GraphQL for up to 1 minute while revalidating (confirm behavior in stage with `Cache-Status` / timing). |
+| `stale-if-error` | **300** | On upstream/resolver errors, serve stale cache for up to 5 minutes when available. |
+
+If homepage still feels slow right after the fresh minute expires, raise `stale-while-revalidate` (for example `300`) before raising `max-age` again.
+
+The cache key is the whole GraphQL request, so a different `blockId` or different arguments is a different entry. There is no per-query or per-id setting.
+
+A brand or block save does not clear one mesh entry. `aio api-mesh:cache:purge -a` clears every cached response for this mesh. After a mesh update that changes cached data, purge before measuring again.
+
+Check the HTTP headers `Cache-Status` (`HIT` or `MISS`) and `Age`. The first call with no cached entry still runs the full resolver (App Builder + `productSearch`).
+
+After deploy: `aio api-mesh update meshConfig.json -s secrets.yaml` then purge cache if you need a clean baseline.
 
 ## CORS (browser / EDS)
 
@@ -164,6 +187,8 @@ aio api-mesh describe
 ```
 
 **Import errors:** run commands from `api-mesh/`; keep paths like `./schema.graphql` and `./resolvers.js` in the same folder; do not use a `.graphql` file as a graphql `endpoint`. The CLI minifies imported files with `jsmin` — **do not use GraphQL block strings (`"""…"""`)** in `schema.graphql` or import fails with *Unable to import the files in the mesh config*.
+
+**Mutations:** The JsonSchema stub defines both `lfMeshStub` (Query) and `lfMeshStubMutation` (Mutation) so the merged schema registers a **Mutation** root. Custom fields such as `littleFarmsRecordBlogVisit` use `extend type Mutation` and programmatic resolvers; do not remove the mutation stub or the edge returns *Schema is not configured to execute mutation operation*.
 
 ### Troubleshooting: `The secret LITTLEFARMS_BLOCK_STOREFRONT_URL is not available`
 

@@ -9,7 +9,8 @@ const CONTENT_TYPES = {
   'image/gif': 'gif',
   'image/webp': 'webp'
 }
-const KINDS = ['logo', 'locationImage', 'mapMarker', 'storeBanner']
+const LOCATION_KINDS = ['logo', 'locationImage', 'mapMarker', 'storeBanner']
+const CONTENT_ASSET_KINDS = ['serviceIcon', 'galleryImage', 'teamImage']
 
 function safeSegment (value) {
   return encodeURIComponent(String(value || '').trim()).slice(0, 80)
@@ -20,13 +21,17 @@ async function main (params) {
 
   try {
     const locationKey = safeSegment(params.locationKey)
-    const kind = KINDS.includes(params.kind) ? params.kind : ''
+    const kind = String(params.kind || '').trim()
+    const contentAsset = CONTENT_ASSET_KINDS.includes(kind)
+    const locationAsset = LOCATION_KINDS.includes(kind)
     const contentType = String(params.contentType || '').trim().toLowerCase()
     const extension = CONTENT_TYPES[contentType]
     const content = String(params.content || '').replace(/\s/g, '')
 
-    if (!locationKey) return errorResponse(400, 'locationKey is required.', logger)
-    if (!kind) return errorResponse(400, 'Image kind is not valid.', logger)
+    const contentId = safeSegment(params.contentId)
+    if (contentAsset && !contentId) return errorResponse(400, 'contentId is required for content images.', logger)
+    if (locationAsset && !locationKey) return errorResponse(400, 'locationKey is required.', logger)
+    if (!contentAsset && !locationAsset) return errorResponse(400, 'Image kind is not valid.', logger)
     if (!extension) return errorResponse(400, 'Image must be a jpeg, png, gif, or webp file.', logger)
     if (!content || !/^[A-Za-z0-9+/]+=*$/.test(content)) {
       return errorResponse(400, 'Image content is not valid.', logger)
@@ -37,7 +42,9 @@ async function main (params) {
       return errorResponse(400, 'Image must be between 1 byte and 1 MB.', logger)
     }
 
-    const path = `public/locations/${locationKey}/${kind}-${Date.now()}.${extension}`
+    const path = contentAsset
+      ? `public/locations/content/${kind}/${contentId}/${Date.now()}.${extension}`
+      : `public/locations/${locationKey}/${kind}-${Date.now()}.${extension}`
     const files = await filesLib.init()
     await files.write(path, bytes)
     const properties = await files.getProperties(path)

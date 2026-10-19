@@ -1,4 +1,5 @@
 import actions from "../config.json";
+import type { ContentPickerResponse, LocationContentKind } from "./location-content-types.ts";
 
 type Ims = {
   imsToken: string;
@@ -29,6 +30,16 @@ export async function invokeLocationAction<T>(ims: Ims, name: string, params: Re
     throw new Error(payload.error || `Request failed with status ${response.status}.`);
   }
   return payload as T;
+}
+
+export async function loadLocationContentPicker(
+  ims: Ims,
+  kind: LocationContentKind,
+): Promise<ContentPickerResponse> {
+  return invokeLocationAction<ContentPickerResponse>(ims, "location-content-list", {
+    kind,
+    picker: true,
+  });
 }
 
 export function fileToBase64(file: File): Promise<string> {

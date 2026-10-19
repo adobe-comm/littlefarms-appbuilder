@@ -1,7 +1,6 @@
 const { Core } = require('@adobe/aio-sdk')
 const libDb = require('@adobe/aio-lib-db')
 
-const { resolveEnvironmentId } = require('../../block/lib/app-scope')
 const {
   CATEGORIES_COLLECTION,
   TAGS_COLLECTION,
@@ -155,7 +154,7 @@ function publicListItem (doc, usedInPosts, variant) {
 }
 
 function createTaxonomyStore (params, { collectionName, type, counterKey, variant }) {
-  const environmentId = resolveEnvironmentId(params)
+  const counterId = counterKey
 
   async function withCollection (callback) {
     const opened = await openDb(params, collectionName)
@@ -175,18 +174,24 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
     }
   }
 
-  async function readAllDocs () {
-    return withCollection(async collection => {
-      const docs = []
-      let skip = 0
-      for (;;) {
-        const batch = await collection.find({ environmentId, type }).skip(skip).limit(READ_BATCH).toArray()
-        docs.push(...batch)
-        if (batch.length < READ_BATCH) break
-        skip += batch.length
-      }
-      return docs
-    })
+  async function readAllDocs (collection) {
+    const docs = []
+    let skip = 0
+    for (;;) {
+      const batch = await collection.find({ type }).skip(skip).limit(READ_BATCH).toArray()
+      docs.push(...batch)
+      if (batch.length < READ_BATCH) break
+      skip += batch.length
+    }
+    return docs
+  }
+
+  async function findTaxonomyDoc (collection, filter) {
+    return findOneOrNull(collection, { type, ...filter })
+  }
+
+  async function loadAllDocs () {
+    return withCollection(collection => readAllDocs(collection))
   }
 
   async function usageCounts () {
@@ -194,7 +199,7 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
     await withPosts(async posts => {
       let skip = 0
       for (;;) {
-        const batch = await posts.find({ environmentId, type: 'blog_post' }).skip(skip).limit(READ_BATCH).toArray()
+        const batch = await posts.find({ type: 'blog_post' }).skip(skip).limit(READ_BATCH).toArray()
         for (const doc of batch) {
           const field = type === 'blog_tag' ? 'tag_ids' : 'category_ids'
           const ids = Array.isArray(doc[field]) ? doc[field] : []
@@ -211,7 +216,7 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
   }
 
   async function takenUrlKeys (exceptId) {
-    const docs = await readAllDocs()
+    const docs = await loadAllDocs()
     const taken = new Set()
     for (const doc of docs) {
       if (exceptId && doc.taxonomyId === exceptId) continue
@@ -276,7 +281,7 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
 
     if (variant !== 'category') return record
 
-    const docs = await readAllDocs()
+    const docs = await loadAllDocs()
     let parent_id = null
     const parentRaw = fields.parent_id
     if (parentRaw !== null && parentRaw !== undefined && text(parentRaw) !== '') {
@@ -313,7 +318,7 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
 
   return {
     async list ({ page, pageSize, sortDir, filters = {}, listAll = false }) {
-      const [docs, usage] = await Promise.all([readAllDocs(), usageCounts()])
+      const [docs, usage] = await Promise.all([loadAllDocs(), usageCounts()])
       const matched = docs.filter(doc => matchesFilters(doc, filters))
       sortDocs(matched, sortDir)
       const items = matched.map(doc => publicListItem(doc, usage.get(String(doc.taxonomyId)) || 0, variant))
@@ -336,7 +341,7 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
       const id = Number(taxonomyId)
       if (!Number.isInteger(id) || id <= 0) throw httpError(400, 'Id is not valid.')
       return withCollection(async collection => {
-        const doc = await findOneOrNull(collection, { environmentId, type, taxonomyId: id })
+        const doc = await findTaxonomyDoc(collection, { taxonomyId: id })
         return doc ? toForm(doc, variant) : null
       })
     },
@@ -347,32 +352,29 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
       const now = new Date().toISOString()
       return withCollection(async collection => {
         if (Number.isInteger(id) && id > 0) {
-          const existing = await findOneOrNull(collection, { environmentId, type, taxonomyId: id })
+          const existing = await findTaxonomyDoc(collection, { taxonomyId: id })
           if (!existing) throw httpError(404, 'Record not found.')
           const document = {
             ...existing,
             ...record,
             id: existing.id,
             type,
-            environmentId,
             taxonomyId: id,
             updatedAt: now
           }
           await collection.replaceOne({ id: existing.id }, document)
           return toForm(document, variant)
         }
-        const counterId = `${counterKey}:${environmentId}`
         const counter = await findOneOrNull(collection, { id: counterId })
         const nextId = Number(counter?.nextId) > 0 ? Number(counter.nextId) : 1
-        const counterDoc = { id: counterId, type: 'counter', environmentId, nextId: nextId + 1 }
+        const counterDoc = { id: counterId, type: 'counter', nextId: nextId + 1 }
         if (counter) await collection.replaceOne({ id: counterId }, counterDoc)
         else await collection.insertOne(counterDoc)
         const prefix = type === 'blog_tag' ? 'tag' : 'cat'
         const document = {
           ...record,
-          id: `${prefix}:${environmentId}:${nextId}`,
+          id: `${prefix}:${nextId}`,
           type,
-          environmentId,
           taxonomyId: nextId,
           createdAt: now,
           updatedAt: now
@@ -386,7 +388,7 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
       const taxonomyIds = [...new Set((Array.isArray(ids) ? ids : []).map(value => Number(value)).filter(id => Number.isInteger(id) && id > 0))]
       if (!taxonomyIds.length) throw httpError(400, "You haven't selected any items!")
       if (variant === 'category') {
-        const docs = await readAllDocs()
+        const docs = await loadAllDocs()
         for (const taxonomyId of taxonomyIds) {
           const hasChild = docs.some(doc => Number(doc.parent_id) === taxonomyId)
           if (hasChild) throw httpError(400, 'Delete child categories before deleting this category.')
@@ -394,7 +396,6 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
       }
       return withCollection(async collection => {
         const result = await collection.deleteMany({
-          environmentId,
           type,
           taxonomyId: { $in: taxonomyIds }
         })
@@ -405,12 +406,44 @@ function createTaxonomyStore (params, { collectionName, type, counterKey, varian
     async validateIds (ids) {
       const wanted = [...new Set((Array.isArray(ids) ? ids : []).map(id => text(id)).filter(Boolean))]
       if (!wanted.length) return []
-      const docs = await readAllDocs()
+      const docs = await loadAllDocs()
       const known = new Set(docs.filter(doc => doc.is_active !== false).map(doc => String(doc.taxonomyId)))
       for (const id of wanted) {
         if (!known.has(id)) throw httpError(400, `Unknown ${type} id: ${id}`)
       }
       return wanted
+    },
+
+    async listStorefront () {
+      if (variant !== 'category') {
+        throw httpError(400, 'Storefront taxonomy list is only supported for categories.')
+      }
+      const docs = (await loadAllDocs()).filter(doc => doc.is_active !== false)
+      docs.sort((left, right) => {
+        const leftOrder = Number.isFinite(Number(left.sort_order)) ? Number(left.sort_order) : 0
+        const rightOrder = Number.isFinite(Number(right.sort_order)) ? Number(right.sort_order) : 0
+        if (leftOrder !== rightOrder) return leftOrder - rightOrder
+        return (left.taxonomyId || 0) - (right.taxonomyId || 0)
+      })
+      return docs.map(doc => ({
+        categoryId: doc.taxonomyId,
+        title: text(doc.title),
+        url_key: text(doc.url_key),
+        image: text(doc.image),
+        sort_order: Number.isFinite(Number(doc.sort_order)) ? Number(doc.sort_order) : 0,
+        parent_id: doc.parent_id == null || doc.parent_id === '' ? null : Number(doc.parent_id)
+      }))
+    },
+
+    async resolveCategoryId ({ categoryId, categoryUrlKey }) {
+      if (variant !== 'category') return null
+      const id = Number(categoryId)
+      if (Number.isInteger(id) && id > 0) return String(id)
+      const slug = text(categoryUrlKey)
+      if (!slug) return null
+      const docs = await loadAllDocs()
+      const found = docs.find(doc => doc.is_active !== false && text(doc.url_key) === slug)
+      return found ? String(found.taxonomyId) : null
     }
   }
 }

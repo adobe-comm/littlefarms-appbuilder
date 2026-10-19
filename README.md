@@ -133,6 +133,105 @@ Confirm with:
 aio app db index list littlefarms_blocks --json
 ```
 
+## Blog database indexes
+
+Blog actions do not create indexes automatically. Create them once per Runtime namespace that owns the blog collections (`littlefarms_blog_posts`, `littlefarms_blog_categories`, `littlefarms_blog_tags`). Add `--region <value>` when `DB_REGION` is not `amer` (same as [Brand database indexes](#brand-database-indexes)).
+
+**Posts** (`littlefarms_blog_posts`):
+
+```bash
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"postId":1}' \
+  --name blog_post_id \
+  --unique
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"url_key":1}' \
+  --name blog_post_url_key \
+  --unique
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"status":1,"publish_at":-1}' \
+  --name blog_post_published
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"status":1,"view_count":-1}' \
+  --name blog_post_most_read
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"category_ids":1}' \
+  --name blog_post_category
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"tag_ids":1}' \
+  --name blog_post_tag
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"updatedAt":-1}' \
+  --name blog_post_updated
+```
+
+| Index | Speeds up |
+|-------|-----------|
+| `blog_post_id` | Admin get/save/delete, `get-post` and `record-visit` by `postId`, mass delete |
+| `blog_post_url_key` | `get-post` / `record-visit` by URL key; enforces one slug per environment |
+| `blog_post_published` | Published storefront lists sorted by publish date (when queried in DB) |
+| `blog_post_most_read` | `most-read` / `littleFarmsMostReadBlogPosts` |
+| `blog_post_category` | Category-scoped lists (`category_ids` multikey) |
+| `blog_post_tag` | Tag filter on lists |
+| `blog_post_updated` | Admin grid sort by `updatedAt` |
+
+**Categories** (`littlefarms_blog_categories`):
+
+```bash
+aio app db index create littlefarms_blog_categories \
+  --spec '{"environmentId":1,"type":1,"taxonomyId":1}' \
+  --name blog_category_id \
+  --unique
+
+aio app db index create littlefarms_blog_categories \
+  --spec '{"environmentId":1,"type":1,"url_key":1}' \
+  --name blog_category_url_key \
+  --unique
+
+aio app db index create littlefarms_blog_categories \
+  --spec '{"environmentId":1,"type":1,"is_active":1,"sort_order":1}' \
+  --name blog_category_active_sort
+```
+
+| Index | Speeds up |
+|-------|-----------|
+| `blog_category_id` | Admin get/save/delete by category id |
+| `blog_category_url_key` | `list-posts-by-category` when using `categoryUrlKey` |
+| `blog_category_active_sort` | `list-categories` / `littleFarmsBlogCategories` |
+
+**Tags** (`littlefarms_blog_tags`):
+
+```bash
+aio app db index create littlefarms_blog_tags \
+  --spec '{"environmentId":1,"type":1,"taxonomyId":1}' \
+  --name blog_tag_id \
+  --unique
+
+aio app db index create littlefarms_blog_tags \
+  --spec '{"environmentId":1,"type":1,"url_key":1}' \
+  --name blog_tag_url_key \
+  --unique
+```
+
+| Index | Speeds up |
+|-------|-----------|
+| `blog_tag_id` | Admin get/save/delete by tag id |
+| `blog_tag_url_key` | Tag URL key lookups and uniqueness |
+
+Storefront list operations still load published posts for the environment and filter in memory today; these indexes speed point lookups (`postId`, `url_key`, category id) and prepare filtered DB queries. Confirm with:
+
+```bash
+aio app db index list littlefarms_blog_posts --json
+aio app db index list littlefarms_blog_categories --json
+aio app db index list littlefarms_blog_tags --json
+```
+
 ## Config
 
 ### `.env`

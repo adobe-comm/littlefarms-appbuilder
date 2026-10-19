@@ -6,14 +6,17 @@ const { createEvalCache } = require('../block/lib/eval-cache')
 const { createAttributeCatalog } = require('../block/lib/attribute-catalog')
 const { createAttributeState } = require('../block/lib/attribute-state')
 const { createBrandCache } = require('../brand/lib/brand-cache')
+const { createLocationCache } = require('../location/lib/location-cache')
 
 async function flushStorefront (params) {
   const presetCache = await createPresetResultCache(params)
   const evalCache = await createEvalCache(params)
   const brandCache = await createBrandCache(params)
+  const locationCache = await createLocationCache(params)
   await presetCache.invalidateAll()
   await evalCache.invalidate('*')
   await brandCache.invalidateAll()
+  await locationCache.invalidateAll()
 }
 
 async function attributeStatus (params) {
@@ -39,7 +42,7 @@ async function main (params) {
 
     if (operation === 'flush-storefront') {
       await flushStorefront(params)
-      logger.info('Flushed block, evaluation, and brand storefront caches.')
+      logger.info('Flushed block, evaluation, brand, and location caches.')
       return { statusCode: 200, body: { flushed: true, scope: 'storefront' } }
     }
 

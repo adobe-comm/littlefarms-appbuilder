@@ -292,6 +292,108 @@ GraphQL **`littleFarmsLocations`** calls this operation and returns the `items` 
 
 Response shape matches the Admin location form (`location` object with hours, map fields, rich content, and image URLs).
 
+### Blog (posts & categories)
+
+GraphQL: `littleFarmsBlogPosts`, `littleFarmsBlogPostsByCategory`, `littleFarmsBlogPost`, `littleFarmsBlogCategories`, `littleFarmsMostReadBlogPosts`, and mutation **`littleFarmsRecordBlogVisit`** (see [`../api-mesh/schema.graphql`](../api-mesh/schema.graphql)). Mesh calls the public **`blog-storefront`** action.
+
+| `operation` | Purpose |
+|-------------|---------|
+| `list-posts` | Paginated published posts (summary fields + listing/featured images). Optional filters: `categoryId`, `tagId`, `isFeatured`, `isRecipe`, `customerGroupId`. Body: `page`, `pageSize` (default 20, max 100). |
+| `list-posts-by-category` | Same as `list-posts` but scoped to one category. Provide `categoryId` or `categoryUrlKey`. Response includes `categoryId`. |
+| `get-post` | Full post by `postId` or `urlKey`. |
+| `list-categories` | Enabled categories with `categoryId`, `title`, `url_key`, `image`, `sort_order`, `parent_id`. |
+| `most-read` | Top posts by `view_count` (default `limit` 10, max 50). Same optional filters as list. |
+| `record-visit` | Increment `view_count` for a published post (`postId` or `urlKey`). |
+
+List responses: `{ "page", "pageSize", "total", "pageCount", "items": [ … ] }`. Only **published** posts within publish/end window are returned. Customer group restrictions apply when `customerGroupId` is sent.
+
+Example:
+
+```http
+POST /api/v1/web/littlefarms-appbuilder/blog-storefront
+Content-Type: application/json
+
+{"operation":"list-posts","page":1,"pageSize":12}
+```
+
+#### Blog database indexes
+
+`blog-storefront` and blog admin actions do not create indexes. Create them once from the repo root in the Runtime namespace that owns the blog collections. Add `--region` when `DB_REGION` is not `amer`. Full command list and index table: [Blog database indexes](../README.md#blog-database-indexes).
+
+**Posts** — confirm with `aio app db index list littlefarms_blog_posts --json`:
+
+```bash
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"postId":1}' \
+  --name blog_post_id \
+  --unique
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"url_key":1}' \
+  --name blog_post_url_key \
+  --unique
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"status":1,"publish_at":-1}' \
+  --name blog_post_published
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"status":1,"view_count":-1}' \
+  --name blog_post_most_read
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"category_ids":1}' \
+  --name blog_post_category
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"tag_ids":1}' \
+  --name blog_post_tag
+
+aio app db index create littlefarms_blog_posts \
+  --spec '{"environmentId":1,"type":1,"updatedAt":-1}' \
+  --name blog_post_updated
+```
+
+**Categories** — `aio app db index list littlefarms_blog_categories --json`:
+
+```bash
+aio app db index create littlefarms_blog_categories \
+  --spec '{"environmentId":1,"type":1,"taxonomyId":1}' \
+  --name blog_category_id \
+  --unique
+
+aio app db index create littlefarms_blog_categories \
+  --spec '{"environmentId":1,"type":1,"url_key":1}' \
+  --name blog_category_url_key \
+  --unique
+
+aio app db index create littlefarms_blog_categories \
+  --spec '{"environmentId":1,"type":1,"is_active":1,"sort_order":1}' \
+  --name blog_category_active_sort
+```
+
+**Tags** (admin + post tag filters) — `aio app db index list littlefarms_blog_tags --json`:
+
+```bash
+aio app db index create littlefarms_blog_tags \
+  --spec '{"environmentId":1,"type":1,"taxonomyId":1}' \
+  --name blog_tag_id \
+  --unique
+
+aio app db index create littlefarms_blog_tags \
+  --spec '{"environmentId":1,"type":1,"url_key":1}' \
+  --name blog_tag_url_key \
+  --unique
+```
+
+| Collection | Index | Storefront / admin |
+|------------|-------|-------------------|
+| `littlefarms_blog_posts` | `blog_post_id`, `blog_post_url_key` | `get-post`, `record-visit` |
+| `littlefarms_blog_posts` | `blog_post_most_read` | `most-read` |
+| `littlefarms_blog_posts` | `blog_post_category`, `blog_post_tag` | List filters by category/tag |
+| `littlefarms_blog_categories` | `blog_category_url_key` | `list-posts-by-category` with `categoryUrlKey` |
+| `littlefarms_blog_categories` | `blog_category_active_sort` | `list-categories` |
+
 ---
 
 ## Environment variables (App Builder)

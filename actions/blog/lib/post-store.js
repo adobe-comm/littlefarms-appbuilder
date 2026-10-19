@@ -1,7 +1,8 @@
 const { Core } = require('@adobe/aio-sdk')
 const libDb = require('@adobe/aio-lib-db')
 
-const { resolveEnvironmentId } = require('../../block/lib/app-scope')
+const BLOG_POST_COUNTER_ID = 'blog-post-counter'
+
 const { POSTS_COLLECTION, PAGE_SIZES, DEFAULT_PAGE_SIZE, MAX_POSTS, POST_STATUSES } = require('./constants')
 const { slugify, uniqueSlug } = require('./slug')
 const { createCategoryStore, createTagStore } = require('./taxonomy-store')
@@ -100,6 +101,71 @@ function pageSizeOf (value) {
   return PAGE_SIZES.includes(size) ? size : DEFAULT_PAGE_SIZE
 }
 
+function viewCountOf (doc) {
+  const value = Number(doc?.view_count)
+  return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 0
+}
+
+function plainTextExcerpt (html, maxLen) {
+  const plain = text(String(html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' '))
+  return plain.slice(0, maxLen)
+}
+
+function isStorefrontVisible (doc, now = new Date()) {
+  if (text(doc.status) !== 'published') return false
+  const publishAt = text(doc.publish_at)
+  if (publishAt) {
+    const publishTime = Date.parse(publishAt)
+    if (Number.isFinite(publishTime) && publishTime > now.getTime()) return false
+  }
+  const endAt = text(doc.end_at)
+  if (endAt) {
+    const endTime = Date.parse(endAt)
+    if (Number.isFinite(endTime) && endTime <= now.getTime()) return false
+  }
+  return true
+}
+
+function publicPostSummary (doc) {
+  const useShort = doc.use_short_content === true
+  return {
+    postId: doc.postId,
+    title: text(doc.title),
+    url_key: text(doc.url_key),
+    publish_at: text(doc.publish_at),
+    is_featured: doc.is_featured === true,
+    is_recipe: doc.is_recipe === true,
+    listing_image: text(doc.listing_image),
+    featured_image: text(doc.featured_image),
+    short_content: useShort ? text(doc.short_content).slice(0, 500) : plainTextExcerpt(doc.content, 320),
+    view_count: viewCountOf(doc),
+    category_ids: idList(doc.category_ids),
+    tag_ids: idList(doc.tag_ids)
+  }
+}
+
+function publicPostDetail (doc) {
+  return {
+    ...publicPostSummary(doc),
+    content: text(doc.content),
+    short_content: text(doc.short_content),
+    use_short_content: doc.use_short_content === true,
+    mobile_image: text(doc.mobile_image),
+    featured_image_title: text(doc.featured_image_title),
+    featured_image_alt: text(doc.featured_image_alt),
+    featured_image_link: text(doc.featured_image_link),
+    listing_image_title: text(doc.listing_image_title),
+    listing_image_alt: text(doc.listing_image_alt),
+    meta_title: text(doc.meta_title),
+    meta_description: text(doc.meta_description),
+    meta_keywords: text(doc.meta_keywords),
+    meta_prefix: text(doc.meta_prefix),
+    meta_suffix: text(doc.meta_suffix),
+    createdAt: text(doc.createdAt),
+    updatedAt: text(doc.updatedAt)
+  }
+}
+
 function publicPost (doc) {
   return {
     postId: doc.postId,
@@ -113,6 +179,7 @@ function publicPost (doc) {
     category_ids: idList(doc.category_ids),
     tag_ids: idList(doc.tag_ids),
     customer_group_ids: customerGroupIds(doc.customer_group_ids),
+    view_count: viewCountOf(doc),
     updatedAt: text(doc.updatedAt)
   }
 }
@@ -164,6 +231,53 @@ function matchesFilters (doc, filters) {
   return true
 }
 
+function matchesStorefrontFilters (doc, filters = {}) {
+  if (!isStorefrontVisible(doc)) return false
+  const categoryId = text(filters.categoryId)
+  if (categoryId && !idList(doc.category_ids).includes(categoryId)) return false
+  const tagId = text(filters.tagId)
+  if (tagId && !idList(doc.tag_ids).includes(tagId)) return false
+  if (filters.isFeatured === true && doc.is_featured !== true) return false
+  if (filters.isRecipe === true && doc.is_recipe !== true) return false
+  const customerGroupId = text(filters.customerGroupId)
+  if (customerGroupId) {
+    const allowed = customerGroupIds(doc.customer_group_ids)
+    if (allowed.length && !allowed.includes(customerGroupId)) return false
+  }
+  return true
+}
+
+function sortStorefrontPosts (matched, sortMode) {
+  if (sortMode === 'most_read') {
+    matched.sort((left, right) => {
+      const diff = viewCountOf(right) - viewCountOf(left)
+      if (diff !== 0) return diff
+      return (right.postId || 0) - (left.postId || 0)
+    })
+    return
+  }
+  matched.sort((left, right) => {
+    const leftTime = Date.parse(left.publish_at || left.updatedAt || left.createdAt || 0)
+    const rightTime = Date.parse(right.publish_at || right.updatedAt || right.createdAt || 0)
+    if (leftTime !== rightTime) return rightTime - leftTime
+    return (right.postId || 0) - (left.postId || 0)
+  })
+}
+
+function paginateDocs (matched, page, pageSize) {
+  const size = pageSizeOf(pageSize)
+  const pageCount = Math.max(1, Math.ceil(matched.length / size))
+  const current = Math.min(Math.max(1, Number(page) || 1), pageCount)
+  const start = (current - 1) * size
+  return {
+    items: matched.slice(start, start + size),
+    total: matched.length,
+    page: current,
+    pageSize: size,
+    pageCount
+  }
+}
+
 async function findOneOrNull (collection, filter) {
   try {
     return await collection.findOne(filter)
@@ -173,11 +287,11 @@ async function findOneOrNull (collection, filter) {
   }
 }
 
-async function readPosts (collection, environmentId) {
+async function readPosts (collection) {
   const docs = []
   let skip = 0
   for (;;) {
-    const batch = await collection.find({ environmentId, type: 'blog_post' }).skip(skip).limit(READ_BATCH).toArray()
+    const batch = await collection.find({ type: 'blog_post' }).skip(skip).limit(READ_BATCH).toArray()
     docs.push(...batch)
     if (batch.length < READ_BATCH || docs.length >= MAX_POSTS) break
     skip += batch.length
@@ -185,8 +299,11 @@ async function readPosts (collection, environmentId) {
   return docs
 }
 
+async function findPostDoc (posts, filter) {
+  return findOneOrNull(posts, { type: 'blog_post', ...filter })
+}
+
 function createPostStore (params, opener = openPostDb) {
-  const environmentId = resolveEnvironmentId(params)
   const categories = createCategoryStore(params)
   const tags = createTagStore(params)
 
@@ -200,7 +317,7 @@ function createPostStore (params, opener = openPostDb) {
   }
 
   async function loadAll () {
-    return withDb(async ({ posts }) => readPosts(posts, environmentId))
+    return withDb(async ({ posts }) => readPosts(posts))
   }
 
   async function takenUrlKeys (exceptPostId) {
@@ -270,8 +387,6 @@ function createPostStore (params, opener = openPostDb) {
   }
 
   return {
-    environmentId,
-
     async list ({ page, pageSize, sortDir, filters = {} }) {
       const docs = await loadAll()
       const matched = docs.filter(doc => matchesFilters(doc, filters))
@@ -299,7 +414,7 @@ function createPostStore (params, opener = openPostDb) {
       const id = Number(postId)
       if (!Number.isInteger(id) || id <= 0) throw httpError(400, 'Post id is not valid.')
       return withDb(async ({ posts }) => {
-        const doc = await findOneOrNull(posts, { environmentId, type: 'blog_post', postId: id })
+        const doc = await findPostDoc(posts, { postId: id })
         return doc ? toForm(doc) : null
       })
     },
@@ -310,32 +425,31 @@ function createPostStore (params, opener = openPostDb) {
       const now = new Date().toISOString()
       return withDb(async ({ posts }) => {
         if (Number.isInteger(id) && id > 0) {
-          const existing = await findOneOrNull(posts, { environmentId, type: 'blog_post', postId: id })
+          const existing = await findPostDoc(posts, { postId: id })
           if (!existing) throw httpError(404, 'Post not found.')
           const document = {
             ...existing,
             ...record,
             id: existing.id,
             type: 'blog_post',
-            environmentId,
             postId: id,
+            view_count: viewCountOf(existing),
             updatedAt: now
           }
           await posts.replaceOne({ id: existing.id }, document)
           return toForm(document)
         }
-        const counterId = `blog-post-counter:${environmentId}`
-        const counter = await findOneOrNull(posts, { id: counterId })
+        const counter = await findOneOrNull(posts, { id: BLOG_POST_COUNTER_ID })
         const nextId = Number(counter?.nextId) > 0 ? Number(counter.nextId) : 1
-        const counterDoc = { id: counterId, type: 'counter', environmentId, nextId: nextId + 1 }
-        if (counter) await posts.replaceOne({ id: counterId }, counterDoc)
+        const counterDoc = { id: BLOG_POST_COUNTER_ID, type: 'counter', nextId: nextId + 1 }
+        if (counter) await posts.replaceOne({ id: BLOG_POST_COUNTER_ID }, counterDoc)
         else await posts.insertOne(counterDoc)
         const document = {
           ...record,
-          id: `post:${environmentId}:${nextId}`,
+          id: `post:${nextId}`,
           type: 'blog_post',
-          environmentId,
           postId: nextId,
+          view_count: 0,
           createdAt: now,
           updatedAt: now
         }
@@ -349,11 +463,64 @@ function createPostStore (params, opener = openPostDb) {
       if (!ids.length) throw httpError(400, "You haven't selected any items!")
       return withDb(async ({ posts }) => {
         const result = await posts.deleteMany({
-          environmentId,
           type: 'blog_post',
           postId: { $in: ids }
         })
         return { affected: result.deletedCount || 0 }
+      })
+    },
+
+    async listStorefront ({ page, pageSize, filters = {}, sort = 'newest' }) {
+      const docs = await loadAll()
+      const matched = docs.filter(doc => matchesStorefrontFilters(doc, filters))
+      sortStorefrontPosts(matched, sort)
+      const pageResult = paginateDocs(matched, page, pageSize)
+      return {
+        ...pageResult,
+        items: pageResult.items.map(publicPostSummary)
+      }
+    },
+
+    async getStorefront ({ postId, urlKey }) {
+      const id = Number(postId)
+      const slug = text(urlKey)
+      if ((!Number.isInteger(id) || id <= 0) && !slug) {
+        throw httpError(400, 'postId or urlKey is required.')
+      }
+      return withDb(async ({ posts }) => {
+        let doc = null
+        if (Number.isInteger(id) && id > 0) {
+          doc = await findPostDoc(posts, { postId: id })
+        } else {
+          doc = await findPostDoc(posts, { url_key: slug })
+        }
+        if (!doc || !isStorefrontVisible(doc)) return null
+        return publicPostDetail(doc)
+      })
+    },
+
+    async incrementViewCount ({ postId, urlKey }) {
+      const id = Number(postId)
+      const slug = text(urlKey)
+      if ((!Number.isInteger(id) || id <= 0) && !slug) {
+        throw httpError(400, 'postId or urlKey is required.')
+      }
+      return withDb(async ({ posts }) => {
+        let doc = null
+        if (Number.isInteger(id) && id > 0) {
+          doc = await findPostDoc(posts, { postId: id })
+        } else {
+          doc = await findPostDoc(posts, { url_key: slug })
+        }
+        if (!doc || !isStorefrontVisible(doc)) throw httpError(404, 'Post not found.')
+        const nextCount = viewCountOf(doc) + 1
+        const updated = {
+          ...doc,
+          view_count: nextCount,
+          updatedAt: new Date().toISOString()
+        }
+        await posts.replaceOne({ id: doc.id }, updated)
+        return { postId: doc.postId, view_count: nextCount }
       })
     }
   }
@@ -362,5 +529,7 @@ function createPostStore (params, opener = openPostDb) {
 module.exports = {
   createPostStore,
   toForm,
-  publicPost
+  publicPost,
+  publicPostSummary,
+  publicPostDetail
 }

@@ -290,12 +290,45 @@ runtimeManifest:
             memorySize: 256
           annotations:
             <<: *admin-annotations
-        blog-post-list:
-          function: ../../actions/blog/admin/post-list/index.js
+        location-content-list:
+          function: ../../actions/location/admin/content-list/index.js
           web: yes
           runtime: nodejs:22
           inputs:
             <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        location-content-write:
+          function: ../../actions/location/admin/content-write/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        location-content-mass:
+          function: ../../actions/location/admin/content-mass/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            <<: *admin-limits
+          annotations:
+            <<: *admin-annotations
+        blog-post-list:
+          function: ../../actions/blog/admin/post-list/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs: &blog-inputs
+            <<: *admin-inputs
+            COMMERCE_CORE_GRAPHQL_URL: $COMMERCE_CORE_GRAPHQL_URL
+            MAGENTO_ENVIRONMENT_ID: $MAGENTO_ENVIRONMENT_ID
+            AIO_COMMERCE_CONFIG_ENCRYPTION_KEY: $AIO_COMMERCE_CONFIG_ENCRYPTION_KEY
           limits:
             <<: *admin-limits
           annotations:
@@ -305,7 +338,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             <<: *admin-limits
           annotations:
@@ -315,7 +348,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             <<: *admin-limits
           annotations:
@@ -325,7 +358,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             timeout: 20000
             memorySize: 512
@@ -336,7 +369,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             timeout: 15000
             memorySize: 256
@@ -347,7 +380,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             <<: *admin-limits
           annotations:
@@ -357,7 +390,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             <<: *admin-limits
           annotations:
@@ -367,7 +400,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             <<: *admin-limits
           annotations:
@@ -377,7 +410,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             timeout: 20000
             memorySize: 512
@@ -388,7 +421,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             <<: *admin-limits
           annotations:
@@ -398,7 +431,7 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             <<: *admin-limits
           annotations:
@@ -408,11 +441,23 @@ runtimeManifest:
           web: yes
           runtime: nodejs:22
           inputs:
-            <<: *admin-inputs
+            <<: *blog-inputs
           limits:
             <<: *admin-limits
           annotations:
             <<: *admin-annotations
+        blog-storefront:
+          function: ../../actions/blog/storefront/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *blog-inputs
+          limits:
+            timeout: 20000
+            memorySize: 512
+          annotations:
+            final: true
+            include-ims-credentials: true
         location-storefront:
           function: ../../actions/location/storefront/location/index.js
           web: yes

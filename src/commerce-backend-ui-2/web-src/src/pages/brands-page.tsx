@@ -10,6 +10,7 @@ import {
   type BrandRecord,
   type DropdownAttribute,
 } from "./brands-types.ts";
+import { clearBrandsUiState, readBrandsUiState, writeBrandsUiState } from "./brands-ui-state.ts";
 
 type Ims = {
   imsToken: string;
@@ -28,13 +29,18 @@ type BrandGetResponse = {
 
 const PAGE_SIZE = 50;
 
+function initialListState() {
+  const saved = readBrandsUiState();
+  return { page: saved.page, search: saved.search, searchDraft: saved.search };
+}
+
 export function BrandsPage({ ims }: { ims: Ims }) {
   const [attributes, setAttributes] = useState<DropdownAttribute[]>([]);
   const [savedCode, setSavedCode] = useState("");
   const [selectedCode, setSelectedCode] = useState("");
-  const [searchDraft, setSearchDraft] = useState("");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [searchDraft, setSearchDraft] = useState(() => initialListState().searchDraft);
+  const [search, setSearch] = useState(() => initialListState().search);
+  const [page, setPage] = useState(() => initialListState().page);
   const [total, setTotal] = useState(0);
   const [items, setItems] = useState<BrandRecord[]>([]);
   const [brand, setBrand] = useState<BrandRecord | null>(null);
@@ -57,9 +63,36 @@ export function BrandsPage({ ims }: { ims: Ims }) {
       });
       setItems(result.items || []);
       setTotal(result.total || 0);
-      setPage(result.page || nextPage);
+      const resolvedPage = result.page || nextPage;
+      setPage(resolvedPage);
+      writeBrandsUiState({ page: resolvedPage, search: query, optionValue: "" });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load brands.");
+    } finally {
+      setLoading(false);
+    }
+  }, [ims]);
+
+  const openBrand = useCallback(async (optionValue: string, attributeCode: string) => {
+    setMessage("");
+    setLoading(true);
+    try {
+      const result = await invokeBrandAction<BrandGetResponse>(ims, "brand-list", {
+        attributeCode,
+        optionValue,
+        storeViewCode: ALL_STORE_VIEWS,
+      });
+      if (!result.brand) {
+        setMessage("Unable to open the brand.");
+        writeBrandsUiState({ optionValue: "" });
+        return;
+      }
+      const saved = readBrandsUiState();
+      setBrand(result.brand);
+      setSection(saved.section || "general");
+      writeBrandsUiState({ optionValue, section: saved.section || "general" });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to open the brand.");
     } finally {
       setLoading(false);
     }
@@ -75,8 +108,13 @@ export function BrandsPage({ ims }: { ims: Ims }) {
         setAttributes(settings.attributes || []);
         setSavedCode(settings.brandAttributeCode || "");
         setSelectedCode(settings.brandAttributeCode || "");
-        if (settings.brandAttributeCode) await loadList(1, settings.brandAttributeCode);
-        else setLoading(false);
+        if (settings.brandAttributeCode) {
+          const saved = readBrandsUiState();
+          await loadList(saved.page, settings.brandAttributeCode, saved.search);
+          if (saved.optionValue) {
+            await openBrand(saved.optionValue, settings.brandAttributeCode);
+          }
+        } else setLoading(false);
       } catch (error) {
         if (!cancelled) {
           setMessage(error instanceof Error ? error.message : "Unable to load brand settings.");
@@ -88,7 +126,7 @@ export function BrandsPage({ ims }: { ims: Ims }) {
     return () => {
       cancelled = true;
     };
-  }, [ims, loadList]);
+  }, [ims, loadList, openBrand]);
 
   async function saveAttribute() {
     if (!selectedCode) {
@@ -115,33 +153,12 @@ export function BrandsPage({ ims }: { ims: Ims }) {
       setBrand(null);
       setSearch("");
       setSearchDraft("");
+      clearBrandsUiState();
       await loadList(1, selectedCode, "");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save the brand attribute.");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function openBrand(optionValue: string) {
-    setMessage("");
-    setLoading(true);
-    try {
-      const result = await invokeBrandAction<BrandGetResponse>(ims, "brand-list", {
-        attributeCode: savedCode,
-        optionValue,
-        storeViewCode: ALL_STORE_VIEWS,
-      });
-      if (!result.brand) {
-        setMessage("Unable to open the brand.");
-        return;
-      }
-      setBrand(result.brand);
-      setSection("general");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to open the brand.");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -238,10 +255,17 @@ export function BrandsPage({ ims }: { ims: Ims }) {
         navTitle="Brand information"
         sections={brandSections()}
         activeSectionId={section}
-        onSectionChange={setSection}
+        onSectionChange={next => {
+          setSection(next);
+          writeBrandsUiState({ section: next });
+        }}
         headerActions={(
           <div className="actions">
-            <button type="button" onClick={() => { setBrand(null); void loadList(page, savedCode, search); }}>Back</button>
+            <button type="button" onClick={() => {
+              setBrand(null);
+              writeBrandsUiState({ optionValue: "" });
+              void loadList(page, savedCode, search);
+            }}>Back</button>
             <button type="button" className="primary" disabled={saving} onClick={() => void saveBrand()}>
               {saving ? "Saving…" : "Save"}
             </button>
@@ -356,7 +380,7 @@ export function BrandsPage({ ims }: { ims: Ims }) {
                       <td>{item.url_alias}</td>
                       <td className="brand-description">{plainText(item.description || "")}</td>
                       <td>
-                        <button type="button" className="admin-edit" onClick={() => void openBrand(item.optionValue)}>Edit</button>
+                        <button type="button" className="admin-edit" onClick={() => void openBrand(item.optionValue, savedCode)}>Edit</button>
                       </td>
                     </tr>
                   ))}

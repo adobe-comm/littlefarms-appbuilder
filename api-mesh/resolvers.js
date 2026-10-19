@@ -406,6 +406,119 @@ function blockSkus (block) {
   return skus
 }
 
+function mapBlogPostSummary (item) {
+  if (!item || item.postId == null) return null
+  return {
+    postId: Number(item.postId),
+    title: item.title || '',
+    urlKey: item.url_key || '',
+    publishAt: item.publish_at || '',
+    isFeatured: item.is_featured === true,
+    isRecipe: item.is_recipe === true,
+    listingImage: item.listing_image || '',
+    featuredImage: item.featured_image || '',
+    shortContent: item.short_content || '',
+    viewCount: Number(item.view_count) || 0,
+    categoryIds: (item.category_ids || []).map(function (id) { return Number(id) }).filter(function (id) { return id > 0 }),
+    tagIds: (item.tag_ids || []).map(function (id) { return Number(id) }).filter(function (id) { return id > 0 })
+  }
+}
+
+function mapBlogPostDetail (item) {
+  var summary = mapBlogPostSummary(item)
+  if (!summary) return null
+  return {
+    postId: summary.postId,
+    title: summary.title,
+    urlKey: summary.urlKey,
+    publishAt: summary.publishAt,
+    isFeatured: summary.isFeatured,
+    isRecipe: summary.isRecipe,
+    listingImage: summary.listingImage,
+    featuredImage: summary.featuredImage,
+    shortContent: summary.shortContent,
+    viewCount: summary.viewCount,
+    categoryIds: summary.categoryIds,
+    tagIds: summary.tagIds,
+    content: item.content || '',
+    useShortContent: item.use_short_content === true,
+    mobileImage: item.mobile_image || '',
+    featuredImageTitle: item.featured_image_title || '',
+    featuredImageAlt: item.featured_image_alt || '',
+    featuredImageLink: item.featured_image_link || '',
+    listingImageTitle: item.listing_image_title || '',
+    listingImageAlt: item.listing_image_alt || '',
+    metaTitle: item.meta_title || '',
+    metaDescription: item.meta_description || '',
+    metaKeywords: item.meta_keywords || '',
+    metaPrefix: item.meta_prefix || '',
+    metaSuffix: item.meta_suffix || '',
+    createdAt: item.createdAt || '',
+    updatedAt: item.updatedAt || ''
+  }
+}
+
+function mapBlogPostsPayload (payload) {
+  payload = payload || {}
+  return {
+    page: Number(payload.page) || 1,
+    pageSize: Number(payload.pageSize) || 20,
+    total: Number(payload.total) || 0,
+    pageCount: Number(payload.pageCount) || 0,
+    items: (payload.items || []).map(mapBlogPostSummary).filter(Boolean)
+  }
+}
+
+function mapBlogCategory (item) {
+  if (!item || item.categoryId == null) return null
+  return {
+    categoryId: Number(item.categoryId),
+    title: item.title || '',
+    urlKey: item.url_key || '',
+    image: item.image || '',
+    sortOrder: Number(item.sort_order) || 0,
+    parentId: item.parent_id == null || item.parent_id === '' ? null : Number(item.parent_id)
+  }
+}
+
+function blogListFiltersFrom (args) {
+  var body = {}
+  if (args.categoryId != null) body.categoryId = args.categoryId
+  if (args.tagId != null) body.tagId = args.tagId
+  if (typeof args.isFeatured === 'boolean') body.isFeatured = args.isFeatured
+  if (typeof args.isRecipe === 'boolean') body.isRecipe = args.isRecipe
+  if (args.customerGroupId != null) body.customerGroupId = args.customerGroupId
+  return body
+}
+
+function blogStorefrontPost (secrets, body) {
+  return postJson(
+    secrets.LITTLEFARMS_BLOG_STOREFRONT_URL,
+    '',
+    body,
+    { skipSecret: true }
+  )
+}
+
+function resolveLittleFarmsRecordBlogVisit (_root, args, context) {
+  var secrets = secretsFrom(context)
+  var postId = args.postId != null ? Number(args.postId) : null
+  var urlKey = String(args.urlKey || '').trim()
+  var lookups = [(postId > 0 ? String(postId) : ''), urlKey].filter(Boolean)
+  if (lookups.length !== 1) {
+    return Promise.reject(new Error('littleFarmsRecordBlogVisit requires exactly one of postId or urlKey.'))
+  }
+  var body = { operation: 'record-visit' }
+  if (postId > 0) body.postId = postId
+  else body.urlKey = urlKey
+  return blogStorefrontPost(secrets, body).then(function (payload) {
+    return {
+      postId: Number(payload.postId),
+      viewCount: Number(payload.view_count) || 0
+    }
+  })
+}
+
 function enrichBlocks (blocks, secrets, extra) {
   var skus = []
   ;(blocks || []).forEach(function (block) {
@@ -586,6 +699,78 @@ module.exports = {
             return (payload.items || []).map(mapLocationGeneral).filter(Boolean)
           })
         }
+      },
+      littleFarmsBlogPosts: {
+        resolve: function (_root, args, context) {
+          var secrets = secretsFrom(context)
+          var body = { operation: 'list-posts' }
+          if (args.page != null) body.page = args.page
+          if (args.pageSize != null) body.pageSize = args.pageSize
+          Object.assign(body, blogListFiltersFrom(args))
+          return blogStorefrontPost(secrets, body).then(mapBlogPostsPayload)
+        }
+      },
+      littleFarmsBlogPostsByCategory: {
+        resolve: function (_root, args, context) {
+          var secrets = secretsFrom(context)
+          var categoryId = args.categoryId != null ? Number(args.categoryId) : null
+          var categoryUrlKey = String(args.categoryUrlKey || '').trim()
+          if (!(categoryId > 0) && !categoryUrlKey) {
+            return Promise.reject(new Error('littleFarmsBlogPostsByCategory requires categoryId or categoryUrlKey.'))
+          }
+          var body = { operation: 'list-posts-by-category' }
+          if (categoryId > 0) body.categoryId = categoryId
+          if (categoryUrlKey) body.categoryUrlKey = categoryUrlKey
+          if (args.page != null) body.page = args.page
+          if (args.pageSize != null) body.pageSize = args.pageSize
+          Object.assign(body, blogListFiltersFrom(args))
+          return blogStorefrontPost(secrets, body).then(function (payload) {
+            var mapped = mapBlogPostsPayload(payload)
+            mapped.categoryId = Number(payload.categoryId) || categoryId || 0
+            return mapped
+          })
+        }
+      },
+      littleFarmsBlogPost: {
+        resolve: function (_root, args, context) {
+          var secrets = secretsFrom(context)
+          var postId = args.postId != null ? Number(args.postId) : null
+          var urlKey = String(args.urlKey || '').trim()
+          var lookups = [(postId > 0 ? String(postId) : ''), urlKey].filter(Boolean)
+          if (lookups.length !== 1) {
+            return Promise.reject(new Error('littleFarmsBlogPost requires exactly one of postId or urlKey.'))
+          }
+          var body = { operation: 'get-post' }
+          if (postId > 0) body.postId = postId
+          else body.urlKey = urlKey
+          return blogStorefrontPost(secrets, body).then(function (payload) {
+            return mapBlogPostDetail(payload.post)
+          })
+        }
+      },
+      littleFarmsBlogCategories: {
+        resolve: function (_root, _args, context) {
+          var secrets = secretsFrom(context)
+          return blogStorefrontPost(secrets, { operation: 'list-categories' }).then(function (payload) {
+            return (payload.items || []).map(mapBlogCategory).filter(Boolean)
+          })
+        }
+      },
+      littleFarmsMostReadBlogPosts: {
+        resolve: function (_root, args, context) {
+          var secrets = secretsFrom(context)
+          var body = { operation: 'most-read' }
+          if (args.limit != null) body.limit = args.limit
+          Object.assign(body, blogListFiltersFrom(args))
+          return blogStorefrontPost(secrets, body).then(function (payload) {
+            return (payload.items || []).map(mapBlogPostSummary).filter(Boolean)
+          })
+        }
+      }
+    },
+    Mutation: {
+      littleFarmsRecordBlogVisit: {
+        resolve: resolveLittleFarmsRecordBlogVisit
       }
     }
   }

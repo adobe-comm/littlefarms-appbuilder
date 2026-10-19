@@ -12,6 +12,12 @@
                 "field": "lfMeshStub",
                 "path": "/posts/1",
                 "method": "GET"
+              },
+              {
+                "type": "Mutation",
+                "field": "lfMeshStubMutation",
+                "path": "/posts/1",
+                "method": "GET"
               }
             ],
             "operationHeaders": {
@@ -19,6 +25,7 @@
               "x-lf-evaluate-url": "{context.secrets.LITTLEFARMS_BLOCK_EVALUATE_URL}",
               "x-lf-brand-url": "{context.secrets.LITTLEFARMS_BRAND_STOREFRONT_URL}",
               "x-lf-location-url": "{context.secrets.LITTLEFARMS_LOCATION_STOREFRONT_URL}",
+              "x-lf-blog-url": "{context.secrets.LITTLEFARMS_BLOG_STOREFRONT_URL}",
               "x-lf-shared-secret": "{context.secrets.EVALUATE_SHARED_SECRET}",
               "x-lf-commerce-url": "{context.secrets.COMMERCE_CORE_GRAPHQL_URL}",
               "x-lf-environment-id": "{context.secrets.MAGENTO_ENVIRONMENT_ID}",
@@ -31,7 +38,7 @@
         },
         "responseConfig": {
           "cache": {
-            "cacheControl": "public, max-age=300"
+            "cacheControl": "public, max-age=60, stale-while-revalidate=3600, stale-if-error=300"
           }
         }
       }
@@ -53,7 +60,7 @@
       },
       "cache": true,
       "headers": {
-        "Cache-Control": "public, max-age=300"
+        "Cache-Control": "public, max-age=60, stale-while-revalidate=3600, stale-if-error=300"
       }
     }
   }

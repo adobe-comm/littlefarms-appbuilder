@@ -5,10 +5,11 @@ import Runtime, { init } from "@adobe/exc-app";
 
 import config from "../../../commerce-extensibility-1/.generated/app.commerce.config.js";
 import { AppShell, defaultAppModuleId } from "./components/app-shell.tsx";
+import { getAppModule } from "./modules/registry.ts";
 import { CommerceLoader } from "./components/commerce-loader.tsx";
 import { BrandsPage } from "./pages/brands-page.tsx";
 import { BlogPage } from "./pages/blog-page.tsx";
-import { LocationsPage } from "./pages/locations-page.tsx";
+import { LocationsPage } from "./pages/locations-module-page.tsx";
 import { MainPage } from "./pages/main-page.tsx";
 import { SettingsPage } from "./pages/settings-page.tsx";
 
@@ -23,6 +24,29 @@ const SHELL_RUNTIME_HOST = /^(exc-unifiedcontent\.)?experience(-qa|-stage|-cdn|-
 const TIMEOUT_MS = 20000;
 const LOCAL_IMS_TOKEN_KEY = "littlefarmsBlocks.localImsToken";
 const LOCAL_IMS_ORG_ID_KEY = "littlefarmsBlocks.localImsOrgId";
+const ACTIVE_MODULE_KEY = "littlefarms.admin.activeModule";
+const MODULE_HASH_PREFIX = "lf/";
+
+function moduleIdFromHash(): string | null {
+  const raw = window.location.hash.replace(/^#/, "").trim();
+  if (!raw.startsWith(MODULE_HASH_PREFIX)) return null;
+  const id = raw.slice(MODULE_HASH_PREFIX.length);
+  return getAppModule(id) ? id : null;
+}
+
+function readStoredModuleId(): string {
+  return moduleIdFromHash()
+    || getAppModule(window.sessionStorage.getItem(ACTIVE_MODULE_KEY) || "")?.id
+    || defaultAppModuleId;
+}
+
+function writeModuleRoute(moduleId: string) {
+  const nextHash = `#${MODULE_HASH_PREFIX}${moduleId}`;
+  if (window.location.hash !== nextHash) {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+  }
+  window.sessionStorage.setItem(ACTIVE_MODULE_KEY, moduleId);
+}
 
 function localImsCredentials(): Ims | null {
   const imsToken = window.sessionStorage.getItem(LOCAL_IMS_TOKEN_KEY);
@@ -100,7 +124,22 @@ function App() {
     detectHost() === "standalone" ? localImsCredentials() : null
   );
   const [error, setError] = useState<Error | null>(null);
-  const [activeModuleId, setActiveModuleId] = useState(defaultAppModuleId);
+  const [activeModuleId, setActiveModuleId] = useState(readStoredModuleId);
+
+  useEffect(() => {
+    writeModuleRoute(activeModuleId);
+  }, [activeModuleId]);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const fromHash = moduleIdFromHash();
+      if (fromHash && fromHash !== activeModuleId) {
+        setActiveModuleId(fromHash);
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [activeModuleId]);
 
   useEffect(() => {
     const extensionId = config.metadata.id;

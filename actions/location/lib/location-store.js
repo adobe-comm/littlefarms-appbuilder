@@ -1,8 +1,6 @@
 const { Core } = require('@adobe/aio-sdk')
 const libDb = require('@adobe/aio-lib-db')
 
-const { resolveEnvironmentId } = require('../../block/lib/app-scope')
-
 const LOCATIONS_COLLECTION = 'littlefarms_locations'
 const READ_BATCH = 100
 const MAX_LOCATIONS = 5000
@@ -347,11 +345,13 @@ async function findOneOrNull (collection, filter) {
   }
 }
 
-async function readLocations (collection, environmentId) {
+const LOCATION_COUNTER_ID = 'counter:location'
+
+async function readLocations (collection) {
   const docs = []
   let skip = 0
   for (;;) {
-    const batch = await collection.find({ environmentId, type: 'location' }).skip(skip).limit(READ_BATCH).toArray()
+    const batch = await collection.find({ type: 'location' }).skip(skip).limit(READ_BATCH).toArray()
     docs.push(...batch)
     if (batch.length < READ_BATCH || docs.length >= MAX_LOCATIONS) break
     skip += batch.length
@@ -360,8 +360,6 @@ async function readLocations (collection, environmentId) {
 }
 
 function createLocationStore (params, opener = openLocationDb) {
-  const environmentId = resolveEnvironmentId(params)
-
   async function withDb (callback) {
     const opened = await opener(params)
     try {
@@ -372,12 +370,10 @@ function createLocationStore (params, opener = openLocationDb) {
   }
 
   async function loadAll () {
-    return withDb(async ({ locations }) => readLocations(locations, environmentId))
+    return withDb(async ({ locations }) => readLocations(locations))
   }
 
   return {
-    environmentId,
-
     async list ({ page, pageSize, sortDir, filters = {}, exportAll = false }) {
       const docs = await loadAll()
       const countries = [...new Set(docs.map(doc => text(doc.country)).filter(Boolean))].sort((left, right) => left.localeCompare(right))
@@ -405,7 +401,7 @@ function createLocationStore (params, opener = openLocationDb) {
       const id = Number(locationId)
       if (!Number.isInteger(id) || id <= 0) throw httpError(400, 'Location id is not valid.')
       return withDb(async ({ locations }) => {
-        const doc = await findOneOrNull(locations, { environmentId, type: 'location', locationId: id })
+        const doc = await findOneOrNull(locations, { type: 'location', locationId: id })
         return doc ? toForm(doc) : null
       })
     },
@@ -416,7 +412,7 @@ function createLocationStore (params, opener = openLocationDb) {
         const id = Number(idRaw)
         if (!Number.isInteger(id) || id <= 0) throw httpError(400, 'Location id is not valid.')
         return withDb(async ({ locations }) => {
-          const doc = await findOneOrNull(locations, { environmentId, type: 'location', locationId: id })
+          const doc = await findOneOrNull(locations, { type: 'location', locationId: id })
           return doc && isEnabledLocation(doc) ? toForm(doc) : null
         })
       }
@@ -460,23 +456,21 @@ function createLocationStore (params, opener = openLocationDb) {
       return withDb(async ({ locations }) => {
         const id = Number(locationId)
         if (Number.isInteger(id) && id > 0) {
-          const existing = await findOneOrNull(locations, { environmentId, type: 'location', locationId: id })
+          const existing = await findOneOrNull(locations, { type: 'location', locationId: id })
           if (!existing) throw httpError(404, 'Location not found.')
-          const document = { ...existing, ...record, id: existing.id, type: 'location', environmentId, locationId: id, updatedAt: now }
+          const document = { ...existing, ...record, id: existing.id, type: 'location', locationId: id, updatedAt: now }
           await locations.replaceOne({ id: existing.id }, document)
           return toForm(document)
         }
-        const counterId = `counter:${environmentId}`
-        const counter = await findOneOrNull(locations, { id: counterId })
+        const counter = await findOneOrNull(locations, { id: LOCATION_COUNTER_ID })
         const nextId = Number(counter?.nextId) > 0 ? Number(counter.nextId) : 1
-        const counterDoc = { id: counterId, type: 'counter', environmentId, nextId: nextId + 1 }
-        if (counter) await locations.replaceOne({ id: counterId }, counterDoc)
+        const counterDoc = { id: LOCATION_COUNTER_ID, type: 'counter', nextId: nextId + 1 }
+        if (counter) await locations.replaceOne({ id: LOCATION_COUNTER_ID }, counterDoc)
         else await locations.insertOne(counterDoc)
         const document = {
           ...record,
-          id: `loc:${environmentId}:${nextId}`,
+          id: `loc:${nextId}`,
           type: 'location',
-          environmentId,
           locationId: nextId,
           createdAt: now,
           updatedAt: now
@@ -492,13 +486,12 @@ function createLocationStore (params, opener = openLocationDb) {
       if (!['delete', 'enable', 'disable'].includes(operation)) throw httpError(400, 'Unknown mass action.')
       return withDb(async ({ locations }) => {
         const existing = await locations.find({
-          environmentId,
           type: 'location',
           locationId: { $in: locationIdList }
         }).project({ locationId: 1 }).toArray()
         const found = existing.map(doc => doc.locationId)
         if (!found.length) return { affected: 0 }
-        const filter = { environmentId, type: 'location', locationId: { $in: found } }
+        const filter = { type: 'location', locationId: { $in: found } }
         if (operation === 'delete') await locations.deleteMany(filter)
         else {
           await locations.updateMany(filter, {
@@ -518,5 +511,8 @@ module.exports = {
   ALL_STORE_VIEWS,
   STORE_VIEWS,
   generalStorefront,
-  createLocationStore
+  createLocationStore,
+  openLocationDb,
+  sanitizeLocation,
+  toForm
 }

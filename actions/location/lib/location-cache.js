@@ -1,14 +1,7 @@
 const stateLib = require('@adobe/aio-lib-state')
 
 const DIRECTORY_TTL = stateLib.MAX_TTL
-
-function encodePart (value) {
-  return Buffer.from(String(value)).toString('base64url')
-}
-
-function directoryKey (environmentId) {
-  return `location.${encodePart(environmentId)}.directory.general`
-}
+const DIRECTORY_CACHE_KEY = 'location.directory.general'
 
 function parseCached (result) {
   const raw = result?.value
@@ -25,12 +18,9 @@ function parseCached (result) {
 
 async function createLocationCache (params, stateFactory = stateLib.init) {
   const state = await stateFactory({ region: params.STATE_REGION || 'amer' })
-  const { resolveEnvironmentId } = require('../../block/lib/app-scope')
-  const environmentId = resolveEnvironmentId(params)
-  const key = directoryKey(environmentId)
+  const key = DIRECTORY_CACHE_KEY
 
   return {
-    environmentId,
     async getDirectory () {
       return parseCached(await state.get(key))
     },
@@ -47,7 +37,7 @@ async function createLocationCache (params, stateFactory = stateLib.init) {
 }
 
 module.exports = {
-  directoryKey,
+  DIRECTORY_CACHE_KEY,
   DIRECTORY_TTL,
   createLocationCache
 }

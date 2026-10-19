@@ -1,13 +1,13 @@
 const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
 const { createAttributeCatalog } = require('../../../block/lib/attribute-catalog')
-const { withCommerceCoreGraphqlUrl } = require('../../../block/lib/enrich-commerce-params')
+const { withBlogEnvironmentParams } = require('../../lib/blog-scope')
 
 async function main (params) {
   const logger = Core.Logger('blog-customer-groups', { level: params.LOG_LEVEL || 'info' })
 
   try {
-    params = await withCommerceCoreGraphqlUrl(params)
+    params = await withBlogEnvironmentParams(params)
     if (!params.COMMERCE_CORE_GRAPHQL_URL) {
       return {
         statusCode: 200,

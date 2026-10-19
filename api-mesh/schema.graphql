@@ -114,6 +114,39 @@ extend type Query {
   littleFarmsBrandsList: [LittleFarmsBrandSummary!]!
   littleFarmsLocation(locationId: Int, title: String, storeUrl: String): LittleFarmsLocation
   littleFarmsLocations: [LittleFarmsLocationGeneral!]!
+  littleFarmsBlogPosts(
+    page: Int
+    pageSize: Int
+    categoryId: Int
+    tagId: Int
+    isFeatured: Boolean
+    isRecipe: Boolean
+    customerGroupId: Int
+  ): LittleFarmsBlogPostsPayload!
+  littleFarmsBlogPostsByCategory(
+    categoryId: Int
+    categoryUrlKey: String
+    page: Int
+    pageSize: Int
+    tagId: Int
+    isFeatured: Boolean
+    isRecipe: Boolean
+    customerGroupId: Int
+  ): LittleFarmsBlogPostsByCategoryPayload!
+  littleFarmsBlogPost(postId: Int, urlKey: String): LittleFarmsBlogPostDetail
+  littleFarmsBlogCategories: [LittleFarmsBlogCategory!]!
+  littleFarmsMostReadBlogPosts(
+    limit: Int
+    categoryId: Int
+    tagId: Int
+    isFeatured: Boolean
+    isRecipe: Boolean
+    customerGroupId: Int
+  ): [LittleFarmsBlogPostSummary!]!
+}
+
+extend type Mutation {
+  littleFarmsRecordBlogVisit(postId: Int, urlKey: String): LittleFarmsBlogVisitPayload!
 }
 
 type LittleFarmsBrandsPayload {
@@ -217,6 +250,82 @@ type LittleFarmsLocation {
   storeHours: LittleFarmsWeekHours!
   isCafe: Boolean!
   cafeHours: LittleFarmsWeekHours!
+}
+
+type LittleFarmsBlogPostSummary {
+  postId: Int!
+  title: String!
+  urlKey: String!
+  publishAt: String
+  isFeatured: Boolean!
+  isRecipe: Boolean!
+  listingImage: String
+  featuredImage: String
+  shortContent: String
+  viewCount: Int!
+  categoryIds: [Int!]!
+  tagIds: [Int!]!
+}
+
+type LittleFarmsBlogPostDetail {
+  postId: Int!
+  title: String!
+  urlKey: String!
+  publishAt: String
+  isFeatured: Boolean!
+  isRecipe: Boolean!
+  listingImage: String
+  featuredImage: String
+  shortContent: String
+  viewCount: Int!
+  categoryIds: [Int!]!
+  tagIds: [Int!]!
+  content: String
+  useShortContent: Boolean!
+  mobileImage: String
+  featuredImageTitle: String
+  featuredImageAlt: String
+  featuredImageLink: String
+  listingImageTitle: String
+  listingImageAlt: String
+  metaTitle: String
+  metaDescription: String
+  metaKeywords: String
+  metaPrefix: String
+  metaSuffix: String
+  createdAt: String
+  updatedAt: String
+}
+
+type LittleFarmsBlogPostsPayload {
+  page: Int!
+  pageSize: Int!
+  total: Int!
+  pageCount: Int!
+  items: [LittleFarmsBlogPostSummary!]!
+}
+
+type LittleFarmsBlogPostsByCategoryPayload {
+  categoryId: Int!
+  page: Int!
+  pageSize: Int!
+  total: Int!
+  pageCount: Int!
+  items: [LittleFarmsBlogPostSummary!]!
+}
+
+type LittleFarmsBlogCategory {
+  categoryId: Int!
+  title: String!
+  urlKey: String!
+  image: String
+  sortOrder: Int!
+  parentId: Int
+}
+
+type LittleFarmsBlogVisitPayload {
+  postId: Int!
+  viewCount: Int!
 }
 
 type LittleFarmsLocationGeneral {

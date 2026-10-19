@@ -1,11 +1,13 @@
 const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
 const { createPostStore } = require('../../lib/post-store')
+const { withBlogEnvironmentParams } = require('../../lib/blog-scope')
 
 async function main (params) {
   const logger = Core.Logger('blog-post-list', { level: params.LOG_LEVEL || 'info' })
 
   try {
+    params = await withBlogEnvironmentParams(params)
     const store = createPostStore(params)
     const postId = String(params.postId || '').trim()
     if (postId) {

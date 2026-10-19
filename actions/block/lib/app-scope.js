@@ -8,25 +8,27 @@ const GLOBAL_SCOPE_STORE_VIEW = '*'
 /** Default store view sent on ACCS GraphQL calls (API header only; does not scope saved blocks). */
 const CATALOG_GRAPHQL_STORE_VIEW_DEFAULT = 'default'
 
-function resolveEnvironmentId (params) {
-  let environmentId = String(params.MAGENTO_ENVIRONMENT_ID || '').trim()
-  if (!environmentId && params.COMMERCE_CORE_GRAPHQL_URL) {
+function presetScopeFromParams (_params) {
+  return {
+    storeViewCode: GLOBAL_SCOPE_STORE_VIEW
+  }
+}
+
+/**
+ * Commerce SaaS GraphQL API environment segment (HTTP header only — not stored on DB documents).
+ */
+function resolveCommerceEnvironmentId (params) {
+  let id = String(params.MAGENTO_ENVIRONMENT_ID || '').trim()
+  if (!id && params.COMMERCE_CORE_GRAPHQL_URL) {
     try {
-      environmentId = new URL(params.COMMERCE_CORE_GRAPHQL_URL).pathname
+      id = new URL(params.COMMERCE_CORE_GRAPHQL_URL).pathname
         .split('/')
         .filter(segment => segment && segment !== 'graphql')[0] || ''
     } catch {
-      environmentId = ''
+      id = ''
     }
   }
-  return environmentId || 'default'
-}
-
-function presetScopeFromParams (params) {
-  return {
-    storeViewCode: GLOBAL_SCOPE_STORE_VIEW,
-    environmentId: resolveEnvironmentId(params)
-  }
+  return id
 }
 
 function catalogGraphqlStoreView (params) {
@@ -39,5 +41,7 @@ module.exports = {
   CATALOG_GRAPHQL_STORE_VIEW_DEFAULT,
   presetScopeFromParams,
   catalogGraphqlStoreView,
-  resolveEnvironmentId
+  resolveCommerceEnvironmentId,
+  /** @deprecated use resolveCommerceEnvironmentId (Commerce API only) */
+  resolveEnvironmentId: resolveCommerceEnvironmentId
 }

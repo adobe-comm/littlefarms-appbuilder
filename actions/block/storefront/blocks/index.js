@@ -68,11 +68,6 @@ async function loadPresetForGet (store, scope, params) {
     error.statusCode = 404
     throw error
   }
-  if (preset.scope?.environmentId !== scope.environmentId) {
-    const error = new Error('Block not found.')
-    error.statusCode = 404
-    throw error
-  }
   return preset
 }
 
@@ -119,7 +114,7 @@ async function main (params) {
       const cacheId = blockCacheIdentity(preset)
       if (cacheId) {
         const cachedBlock = await timings.track('blockCacheRead', () =>
-          cache.getBlock(scope.environmentId, cacheId, preset.updatedAt)
+          cache.getBlock(cacheId, preset.updatedAt)
         )
         if (cachedBlock) {
           logger.info(`Block ${cacheId} served from State (full block)`)
@@ -135,7 +130,7 @@ async function main (params) {
       if (cacheId) {
         try {
           await timings.track('blockCacheWrite', () =>
-            cache.putBlock(scope.environmentId, cacheId, preset.updatedAt, block)
+            cache.putBlock(cacheId, preset.updatedAt, block)
           )
         } catch (cacheError) {
           logger.warn(`Full block cache write failed for ${cacheId}: ${cacheError.message}`)
@@ -149,7 +144,7 @@ async function main (params) {
     const store = createPresetStore(params)
     const scope = store.scope()
     const listCache = await createPresetResultCache(params)
-    const cached = await listCache.getList(scope.environmentId)
+    const cached = await listCache.getList()
     if (cached) {
       logger.info('Block list served from State')
       return { statusCode: 200, body: cached }
@@ -159,7 +154,7 @@ async function main (params) {
 
     const blocks = presets.map(toPublicBlock)
     const body = { blocks }
-    await listCache.putList(scope.environmentId, body)
+    await listCache.putList(body)
     logger.info(`Stored ${blocks.length} blocks in State`)
     return {
       statusCode: 200,

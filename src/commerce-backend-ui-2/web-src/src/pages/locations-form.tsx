@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { HtmlEditor } from "../components/html-editor.tsx";
 import { CommerceLoader } from "../components/commerce-loader.tsx";
 import { SectionLayout } from "../components/section-layout.tsx";
-import { fileToBase64, invokeLocationAction } from "./locations-api.ts";
+import { fileToBase64, invokeLocationAction, loadLocationContentPicker } from "./locations-api.ts";
+import type { PickerOption } from "./location-content-types.ts";
 import {
   COUNTRIES,
   countryName,
@@ -15,10 +16,7 @@ import {
 } from "./locations-directory.ts";
 import "./locations.css";
 import {
-  GALLERY_OPTIONS,
-  SERVICE_OPTIONS,
   STORE_VIEW_OPTIONS,
-  TEAM_PROFILE_OPTIONS,
   WEEK_DAYS,
   dayLabel,
   emptyLocation,
@@ -130,14 +128,16 @@ function MultiField({
   value,
   onChange,
   help,
+  emptyHint,
 }: {
   id: string;
   label: string;
   required?: boolean;
-  options: string[];
+  options: PickerOption[];
   value: string[];
   onChange: (next: string[]) => void;
   help?: string;
+  emptyHint?: string;
 }) {
   return (
     <div className="field-row">
@@ -154,9 +154,10 @@ function MultiField({
           onChange={event => onChange(selectedValues(event.target))}
         >
           {options.map(option => (
-            <option key={option} value={option}>{option}</option>
+            <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
+        {options.length === 0 && emptyHint ? <p className="field-hint">{emptyHint}</p> : null}
         {help ? (
           <button type="button" className="location-help" title={help} aria-label={help}>?</button>
         ) : null}
@@ -300,6 +301,36 @@ export function LocationEditor({
   const [uploading, setUploading] = useState(false);
   const [finding, setFinding] = useState(false);
   const [editorSeed, setEditorSeed] = useState(0);
+  const [serviceOptions, setServiceOptions] = useState<PickerOption[]>([]);
+  const [galleryOptions, setGalleryOptions] = useState<PickerOption[]>([]);
+  const [teamOptions, setTeamOptions] = useState<PickerOption[]>([]);
+  const [pickerError, setPickerError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPickers() {
+      try {
+        const [services, galleries, team] = await Promise.all([
+          loadLocationContentPicker(ims, "service"),
+          loadLocationContentPicker(ims, "gallery"),
+          loadLocationContentPicker(ims, "team"),
+        ]);
+        if (cancelled) return;
+        setServiceOptions(services.options || []);
+        setGalleryOptions(galleries.options || []);
+        setTeamOptions(team.options || []);
+        setPickerError("");
+      } catch (error) {
+        if (!cancelled) {
+          setPickerError(error instanceof Error ? error.message : "Unable to load store content options.");
+        }
+      }
+    }
+    void loadPickers();
+    return () => {
+      cancelled = true;
+    };
+  }, [ims]);
 
   useEffect(() => {
     if (locationId == null) return;
@@ -520,7 +551,7 @@ export function LocationEditor({
               id="location-store-views"
               label="Store View"
               required
-              options={STORE_VIEW_OPTIONS}
+              options={STORE_VIEW_OPTIONS.map(view => ({ value: view, label: view }))}
               value={record.storeViews}
               onChange={storeViews => patch({ storeViews })}
               help="Choose the store views that can show this location."
@@ -578,16 +609,31 @@ export function LocationEditor({
         {section === "content" ? (
           <section>
             <h2 className="block-edit-section-title">Store Content</h2>
+            {pickerError ? <p className="message" role="status">{pickerError}</p> : null}
             <ImageField id="location-banner" label="Store Banner" url={record.storeBanner} disabled={uploading} onFile={file => void upload("storeBanner", file)} />
             <Field id="location-travel" label="Travel Suggestion">
               <textarea id="location-travel" rows={4} value={record.travelSuggestion} onChange={event => patch({ travelSuggestion: event.target.value })} />
             </Field>
-            <MultiField id="location-services" label="Select Service" options={SERVICE_OPTIONS} value={record.services} onChange={services => patch({ services })} />
+            <MultiField
+              id="location-services"
+              label="Select Service"
+              options={serviceOptions}
+              value={record.services}
+              onChange={services => patch({ services })}
+              emptyHint="Add services under Locations → Service, then return here to link them."
+            />
             <div className="field-row location-editor-row">
               <label htmlFor="location-store-content">Store Content</label>
               <HtmlEditor key={`content-${editorSeed}`} id="location-store-content" label="" hint="" value={record.storeContent} onChange={storeContent => patch({ storeContent })} />
             </div>
-            <MultiField id="location-galleries" label="Select Gallery" options={GALLERY_OPTIONS} value={record.galleries} onChange={galleries => patch({ galleries })} />
+            <MultiField
+              id="location-galleries"
+              label="Select Gallery"
+              options={galleryOptions}
+              value={record.galleries}
+              onChange={galleries => patch({ galleries })}
+              emptyHint="Add gallery images under Locations → Gallery."
+            />
             <Field id="location-gallery-title" label="Store Gallery Title">
               <input id="location-gallery-title" value={record.galleryTitle} onChange={event => patch({ galleryTitle: event.target.value })} />
             </Field>
@@ -595,7 +641,14 @@ export function LocationEditor({
               <label htmlFor="location-gallery-description">Store Gallery Description</label>
               <HtmlEditor key={`gallery-${editorSeed}`} id="location-gallery-description" label="" hint="" value={record.galleryDescription} onChange={galleryDescription => patch({ galleryDescription })} />
             </div>
-            <MultiField id="location-team" label="Select Team Profile" options={TEAM_PROFILE_OPTIONS} value={record.teamProfiles} onChange={teamProfiles => patch({ teamProfiles })} />
+            <MultiField
+              id="location-team"
+              label="Select Team Profile"
+              options={teamOptions}
+              value={record.teamProfiles}
+              onChange={teamProfiles => patch({ teamProfiles })}
+              emptyHint="Add profiles under Locations → Team Profile."
+            />
             <div className="field-row location-editor-row">
               <label htmlFor="location-promotions">Store Promotions</label>
               <HtmlEditor key={`promotions-${editorSeed}`} id="location-promotions" label="" hint="" value={record.promotions} onChange={promotions => patch({ promotions })} />

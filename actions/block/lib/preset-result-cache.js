@@ -3,17 +3,14 @@ const { DEFAULT_PRESET_RESULT_CACHE_TTL } = require('./constants')
 
 const encode = value => Buffer.from(String(value)).toString('base64url')
 const LIST_CACHE_TTL = stateLib.MAX_TTL
+const LIST_CACHE_KEY = 'preset-result.list.global'
 
 function cacheKey (blockId) {
   return `preset-result.${encode(blockId)}`
 }
 
-function listCacheKey (environmentId) {
-  return `preset-result.list.${encode(environmentId || 'default')}.${encode('*')}`
-}
-
-function blockResultCacheKey (environmentId, blockId, updatedAt) {
-  return `preset-result.block.${encode(environmentId || 'default')}.${encode(blockId)}.${encode(String(updatedAt ?? ''))}`
+function blockResultCacheKey (blockId, updatedAt) {
+  return `preset-result.block.${encode(blockId)}.${encode(String(updatedAt ?? ''))}`
 }
 
 async function createPresetResultCache (params, stateFactory, options = {}) {
@@ -39,8 +36,8 @@ async function createPresetResultCache (params, stateFactory, options = {}) {
     },
     put: (blockId, value) =>
       state.put(cacheKey(blockId), JSON.stringify(value), { ttl }),
-    async getBlock (environmentId, blockId, updatedAt) {
-      const result = await state.get(blockResultCacheKey(environmentId, blockId, updatedAt))
+    async getBlock (blockId, updatedAt) {
+      const result = await state.get(blockResultCacheKey(blockId, updatedAt))
       const raw = result?.value
       if (raw == null || raw === '') return null
       if (typeof raw === 'string') {
@@ -52,16 +49,16 @@ async function createPresetResultCache (params, stateFactory, options = {}) {
       }
       return raw
     },
-    putBlock: (environmentId, blockId, updatedAt, block) =>
+    putBlock: (blockId, updatedAt, block) =>
       state.put(
-        blockResultCacheKey(environmentId, blockId, updatedAt),
+        blockResultCacheKey(blockId, updatedAt),
         JSON.stringify(block),
         { ttl }
       ),
     invalidate: blockId => state.delete(cacheKey(blockId)),
     invalidateAll: () => state.deleteAll({ match: 'preset-result.*' }),
-    async getList (environmentId) {
-      const result = await state.get(listCacheKey(environmentId))
+    async getList () {
+      const result = await state.get(LIST_CACHE_KEY)
       const raw = result?.value
       if (raw == null || raw === '') return null
       if (typeof raw === 'string') {
@@ -73,15 +70,15 @@ async function createPresetResultCache (params, stateFactory, options = {}) {
       }
       return raw
     },
-    putList: (environmentId, value) =>
-      state.put(listCacheKey(environmentId), JSON.stringify(value), { ttl: LIST_CACHE_TTL }),
+    putList: value =>
+      state.put(LIST_CACHE_KEY, JSON.stringify(value), { ttl: LIST_CACHE_TTL }),
     invalidateLists: () => state.deleteAll({ match: 'preset-result.list.*' })
   }
 }
 
 module.exports = {
   cacheKey,
-  listCacheKey,
+  LIST_CACHE_KEY,
   blockResultCacheKey,
   createPresetResultCache
 }

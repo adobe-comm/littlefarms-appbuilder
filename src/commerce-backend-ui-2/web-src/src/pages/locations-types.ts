@@ -93,9 +93,6 @@ export type LocationRecord = {
 };
 
 export const STORE_VIEW_OPTIONS = ["All Store Views", "Main Website", "Main Website Store", "Default Store View"];
-export const SERVICE_OPTIONS = ["Butcher"];
-export const GALLERY_OPTIONS = ["Image 1", "Image 2"];
-export const TEAM_PROFILE_OPTIONS: string[] = [];
 
 export const locationSections = [
   { id: "general", label: "General Information" },

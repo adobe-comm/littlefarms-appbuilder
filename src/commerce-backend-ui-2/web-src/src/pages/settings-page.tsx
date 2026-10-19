@@ -48,9 +48,9 @@ export function SettingsPage({ ims }: { ims: Ims }) {
     setError("");
     try {
       await invokeBrandAction(ims, "app-settings", { operation: "flush-storefront" });
-      setMessage("Storefront cache flushed. Block results, product evaluation, and brand pages will load again from Commerce.");
+      setMessage("Cache flushed. Blocks, product evaluation, brand pages, and the location directory will load fresh data on the next request.");
     } catch (flushError) {
-      setError(flushError instanceof Error ? flushError.message : "Unable to flush the storefront cache.");
+      setError(flushError instanceof Error ? flushError.message : "Unable to flush cache.");
     } finally {
       setFlushing(false);
     }
@@ -84,10 +84,10 @@ export function SettingsPage({ ims }: { ims: Ims }) {
       {message ? <p className="message" role="status">{message}</p> : null}
       {error ? <p className="message settings-error" role="alert">{error}</p> : null}
       <section className="settings-card">
-        <h2>Storefront cache</h2>
-        <p>Clears cached block results, product-page evaluation, and brand pages. The next storefront request loads fresh data.</p>
+        <h2>Cache</h2>
+        <p>Clears cached block results, product-page evaluation, brand pages, and the location directory listing.</p>
         <button type="button" onClick={() => void flushStorefrontCache()} disabled={flushing || syncing}>
-          {flushing ? "Flushing…" : "Flush storefront cache"}
+          {flushing ? "Flushing…" : "Flush cache"}
         </button>
       </section>
       <section className="settings-card">

@@ -25,8 +25,12 @@ body {
 }
 
 .lf-module-rail {
+  display: flex;
+  flex-direction: column;
   width: max-content;
   flex-shrink: 0;
+  align-self: stretch;
+  min-height: 100vh;
   border-right: 1px solid #e3e3e3;
   background: #f8f8f8;
   padding: 12px 0;
@@ -41,6 +45,83 @@ body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #666;
+}
+
+.lf-module-rail .lf-module-nav {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.lf-module-rail-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding: 8px 0 0;
+  border-top: 1px solid #e3e3e3;
+}
+
+.lf-module-rail-footer .lf-module-rail-toggle {
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 12px;
+  font-size: inherit;
+  color: #666;
+}
+
+.lf-module-rail-footer .lf-module-rail-toggle:hover {
+  background: #efefef;
+  border-color: transparent;
+}
+
+.lf-module-rail-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 0;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.lf-module-rail-toggle:hover {
+  background: #efefef;
+  border-color: #999;
+}
+
+.lf-module-rail-toggle:focus-visible {
+  outline: 2px solid #2680eb;
+  outline-offset: 1px;
+}
+
+.lf-module-rail-toggle-icon {
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.lf-module-rail-toggle--expand {
+  position: fixed;
+  left: 0;
+  bottom: 16px;
+  z-index: 20;
+  justify-content: center;
+  width: auto;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid #c9c9c9;
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  background: #fff;
+  color: #444;
+  font: inherit;
+  font-size: 13px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
+}
+
+.lf-module-rail-toggle--expand:hover {
+  background: #efefef;
+  border-color: #999;
 }
 
 .lf-module-nav {

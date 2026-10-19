@@ -2,7 +2,6 @@ const { Core } = require('@adobe/aio-sdk')
 const libDb = require('@adobe/aio-lib-db')
 
 const { ATTRIBUTE_CODE } = require('../../block/lib/constants')
-const { resolveEnvironmentId } = require('../../block/lib/app-scope')
 const {
   BRANDS_COLLECTION,
   BRAND_SETTINGS_COLLECTION,
@@ -144,14 +143,14 @@ async function readMatches (collection, filter, fields) {
   return docs
 }
 
-function brandDocumentId (environmentId, attributeCode, optionValue, storeViewCode) {
-  return [environmentId, attributeCode, optionValue, storeViewCode]
+function brandDocumentId (attributeCode, optionValue, storeViewCode) {
+  return ['brand', attributeCode, optionValue, storeViewCode]
     .map(part => encodeURIComponent(String(part)))
     .join(':')
 }
 
-function settingsDocumentId (environmentId) {
-  return `settings:${encodeURIComponent(environmentId)}`
+function settingsDocumentId () {
+  return 'brand:settings'
 }
 
 function pageArgs (page, pageSize) {
@@ -160,10 +159,9 @@ function pageArgs (page, pageSize) {
   return { page: current, pageSize: size, skip: (current - 1) * size }
 }
 
-function emptySettings (environmentId) {
+function emptySettings () {
   return {
-    id: settingsDocumentId(environmentId),
-    environmentId,
+    id: settingsDocumentId(),
     brandAttributeCode: '',
     updatedAt: null
   }
@@ -172,7 +170,6 @@ function emptySettings (environmentId) {
 function choiceFrom (saved) {
   return {
     id: saved.id,
-    environmentId: saved.environmentId,
     brandAttributeCode: saved.brandAttributeCode || '',
     updatedAt: saved.updatedAt || null
   }
@@ -290,14 +287,13 @@ function storefrontBrand (doc) {
   }
 }
 
-function newBrandDocument (environmentId, attributeCode, option, alias) {
+function newBrandDocument (attributeCode, option, alias) {
   const now = new Date().toISOString()
   const optionValue = String(option.value)
   const optionLabel = option.label || optionValue
   return {
     ...FIELD_DEFAULTS,
-    id: brandDocumentId(environmentId, attributeCode, optionValue, ALL_STORE_VIEWS),
-    environmentId,
+    id: brandDocumentId(attributeCode, optionValue, ALL_STORE_VIEWS),
     attributeCode,
     optionValue,
     optionLabel,
@@ -358,10 +354,19 @@ async function findOneOrNull (collection, filter) {
 
 async function openBrandDb (params) {
   const token = await Core.AuthClient.generateAccessToken(params)
-  const db = await libDb.init({
+  const namespace = String(
+    params.__OW_NAMESPACE ||
+    params.OW_NAMESPACE ||
+    process.env.__OW_NAMESPACE ||
+    process.env.AIO_RUNTIME_NAMESPACE ||
+    ''
+  ).trim()
+  const dbConfig = {
     token: token.access_token,
     region: params.DB_REGION || 'amer'
-  })
+  }
+  if (namespace) dbConfig.ow = { namespace }
+  const db = await libDb.init(dbConfig)
   const client = await db.connect()
   const brands = await ensureCollection(client, BRANDS_COLLECTION)
   const settings = await ensureCollection(client, BRAND_SETTINGS_COLLECTION)
@@ -369,8 +374,6 @@ async function openBrandDb (params) {
 }
 
 function createBrandStore (params, opener = openBrandDb) {
-  const environmentId = resolveEnvironmentId(params)
-
   async function withDb (callback) {
     const opened = await opener(params)
     try {
@@ -382,7 +385,6 @@ function createBrandStore (params, opener = openBrandDb) {
 
   function baseFilter (attributeCode, extra = {}) {
     return {
-      environmentId,
       attributeCode,
       storeViewCode: ALL_STORE_VIEWS,
       ...extra
@@ -391,18 +393,16 @@ function createBrandStore (params, opener = openBrandDb) {
 
   async function loadChoiceFromDb () {
     return withDb(async ({ settings }) => {
-      const saved = await findOneOrNull(settings, { id: settingsDocumentId(environmentId) })
-      return choiceFrom(saved || emptySettings(environmentId))
+      const saved = await findOneOrNull(settings, { id: settingsDocumentId() })
+      return choiceFrom(saved || emptySettings())
     })
   }
 
   return {
-    environmentId,
-
     getSettings: async () => {
       const cache = await createBrandCache(params)
       const cached = await cache.getBrandChoice()
-      if (cached && cached.environmentId === environmentId && typeof cached.brandAttributeCode === 'string') {
+      if (cached && typeof cached.brandAttributeCode === 'string') {
         return cached
       }
       const saved = await loadChoiceFromDb()
@@ -419,7 +419,7 @@ function createBrandStore (params, opener = openBrandDb) {
     saveAttributeCode: (brandAttributeCode, confirmAttributeChange) => withDb(async ({ brands, settings }) => {
       const next = String(brandAttributeCode || '').trim()
       if (!ATTRIBUTE_CODE.test(next)) throw httpError(400, 'Choose a dropdown attribute.')
-      const current = await findOneOrNull(settings, { id: settingsDocumentId(environmentId) }) || emptySettings(environmentId)
+      const current = await findOneOrNull(settings, { id: settingsDocumentId() }) || emptySettings()
       if (current.brandAttributeCode === next) {
         await (await createBrandCache(params)).putBrandChoice(choiceFrom(current))
         return { brandAttributeCode: next, changed: false }
@@ -430,19 +430,18 @@ function createBrandStore (params, opener = openBrandDb) {
       const updatedAt = new Date().toISOString()
       const document = {
         ...current,
-        id: settingsDocumentId(environmentId),
-        environmentId,
+        id: settingsDocumentId(),
         brandAttributeCode: next,
         updatedAt
       }
       if (current.updatedAt) await settings.replaceOne({ id: document.id }, document)
       else await settings.insertOne(document)
       await brands.updateMany(
-        { environmentId, attributeCode: { $ne: next } },
+        { attributeCode: { $ne: next } },
         { $set: { hidden: true, updatedAt } }
       )
       await brands.updateMany(
-        { environmentId, attributeCode: next, optionRemoved: { $ne: true } },
+        { attributeCode: next, optionRemoved: { $ne: true } },
         { $set: { hidden: false, updatedAt } }
       )
       await (await createBrandCache(params)).putBrandChoice(choiceFrom(document))
@@ -457,7 +456,6 @@ function createBrandStore (params, opener = openBrandDb) {
       ])
       const byValue = new Map(existing.map(doc => [String(doc.optionValue), doc]))
       const otherAliases = await readMatches(brands, {
-        environmentId,
         storeViewCode: ALL_STORE_VIEWS,
         attributeCode: { $ne: attributeCode }
       }, ['url_alias', 'attributeCode', 'optionValue'])
@@ -474,7 +472,7 @@ function createBrandStore (params, opener = openBrandDb) {
         if (!current) {
           const alias = uniqueSlug(option.label, taken)
           taken.add(alias)
-          fresh.push(newBrandDocument(environmentId, attributeCode, option, alias))
+          fresh.push(newBrandDocument(attributeCode, option, alias))
           continue
         }
         const patch = {}
@@ -524,7 +522,7 @@ function createBrandStore (params, opener = openBrandDb) {
         brands.countDocuments(filter),
         brands.find(filter).sort({ optionLabel: 1 }).skip(paging.skip).limit(paging.pageSize).toArray()
       ])
-      const items = await overlayPage(brands, environmentId, attributeCode, storeViewCode, bases)
+      const items = await overlayPage(brands, attributeCode, storeViewCode, bases)
       return { page: paging.page, pageSize: paging.pageSize, total, items }
     }),
 
@@ -537,7 +535,6 @@ function createBrandStore (params, opener = openBrandDb) {
       const override = scope === ALL_STORE_VIEWS
         ? null
         : await findOneOrNull(brands, {
-          environmentId,
           attributeCode,
           storeViewCode: scope,
           optionValue: value
@@ -558,7 +555,6 @@ function createBrandStore (params, opener = openBrandDb) {
         const override = scope === ALL_STORE_VIEWS
           ? null
           : await findOneOrNull(brands, {
-            environmentId,
             attributeCode,
             storeViewCode: scope,
             url_alias: alias
@@ -574,7 +570,6 @@ function createBrandStore (params, opener = openBrandDb) {
       const override = scope === ALL_STORE_VIEWS
         ? null
         : await findOneOrNull(brands, {
-          environmentId,
           attributeCode,
           storeViewCode: scope,
           optionValue: base.optionValue
@@ -595,7 +590,7 @@ function createBrandStore (params, opener = openBrandDb) {
         'optionValue', 'optionLabel', 'url_alias', 'image', 'is_active', 'hidden', 'optionRemoved'
       ])
       bases.sort((left, right) => String(left.optionLabel).localeCompare(String(right.optionLabel)))
-      const merged = await overlayPage(brands, environmentId, attributeCode, scope, bases)
+      const merged = await overlayPage(brands, attributeCode, scope, bases)
       const items = merged.filter(isVisible).map(doc => ({
         id: String(doc.optionValue),
         name: doc.optionLabel || '',
@@ -614,7 +609,7 @@ function createBrandStore (params, opener = openBrandDb) {
         optionRemoved: false,
         ...criteriaDbFilter(criteria, widget)
       })).project(projection(PAGE_FIELDS)).sort({ optionLabel: 1 }).toArray()
-      const merged = await overlayPage(brands, environmentId, attributeCode, scope, bases)
+      const merged = await overlayPage(brands, attributeCode, scope, bases)
       const visible = merged.filter(doc => {
         if (!doc || doc.hidden === true || doc.optionRemoved === true) return false
         if (criteria.isActive == null && !isVisible(doc)) return false
@@ -644,7 +639,7 @@ function createBrandStore (params, opener = openBrandDb) {
       for (const field of useDefault) {
         if (USE_DEFAULT_FIELDS.includes(field)) patch[`${field}_use_default`] = true
       }
-      if (patch.url_alias) await assertAliasAvailable(brands, environmentId, attributeCode, value, scope, patch.url_alias)
+      if (patch.url_alias) await assertAliasAvailable(brands, attributeCode, value, scope, patch.url_alias)
 
       const updatedAt = new Date().toISOString()
       if (scope === ALL_STORE_VIEWS) {
@@ -655,10 +650,9 @@ function createBrandStore (params, opener = openBrandDb) {
         return mergeBrand(next, null, ALL_STORE_VIEWS)
       }
 
-      const overrideId = brandDocumentId(environmentId, attributeCode, value, scope)
+      const overrideId = brandDocumentId(attributeCode, value, scope)
       const existing = await findOneOrNull(brands, { id: overrideId }) || {
         id: overrideId,
-        environmentId,
         attributeCode,
         optionValue: value,
         optionLabel: base.optionLabel,
@@ -686,13 +680,12 @@ function projection (fields) {
   }, { id: 1 })
 }
 
-async function overlayPage (brands, environmentId, attributeCode, storeViewCode, bases) {
+async function overlayPage (brands, attributeCode, storeViewCode, bases) {
   if (!bases.length || storeViewCode === ALL_STORE_VIEWS) {
     return bases.map(base => mergeBrand(base, null, storeViewCode || ALL_STORE_VIEWS))
   }
   const optionValues = bases.map(base => base.optionValue)
   const overrides = await brands.find({
-    environmentId,
     attributeCode,
     storeViewCode,
     optionValue: { $in: optionValues }
@@ -701,9 +694,8 @@ async function overlayPage (brands, environmentId, attributeCode, storeViewCode,
   return bases.map(base => mergeBrand(base, byValue.get(String(base.optionValue)), storeViewCode))
 }
 
-async function assertAliasAvailable (brands, environmentId, attributeCode, optionValue, storeViewCode, alias) {
+async function assertAliasAvailable (brands, attributeCode, optionValue, storeViewCode, alias) {
   const match = await findOneOrNull(brands, {
-    environmentId,
     attributeCode,
     storeViewCode,
     url_alias: alias

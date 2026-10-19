@@ -88,7 +88,7 @@ function massMessage(operation: MassOperation, affected: number): string {
   return `A total of ${affected} record(s) have been enabled.`;
 }
 
-export function LocationsPage({ ims }: { ims: Ims }) {
+export function LocationStoresPage({ ims }: { ims: Ims }) {
   const [items, setItems] = useState<StoreLocation[]>([]);
   const [total, setTotal] = useState(0);
   const [countries, setCountries] = useState<string[]>([]);
@@ -265,9 +265,9 @@ export function LocationsPage({ ims }: { ims: Ims }) {
   }
 
   return (
-    <main className="conditional-blocks admin-list">
+    <main className="conditional-blocks admin-list locations-page">
       <header className="admin-list-header">
-        <h1>Locations</h1>
+        <h1>Stores</h1>
       </header>
       <div className="admin-list-band">
         <button type="button" className="admin-primary" onClick={() => setFormIntent("create")}>
