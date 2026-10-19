@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import actions from "../config.json";
+import { invokeRuntimeAction } from "../runtime-action.ts";
 import {
   blockTypes,
   BLOCK_TYPE_FEATURED_RECOMMENDED,
@@ -269,11 +269,6 @@ function displayBlockId(preset: SavedCondition): string {
   if (preset.blockId || /^\d+$/.test(preset.id)) return lookup;
   if (preset.sequence) return String(preset.sequence);
   return lookup.slice(0, 8);
-}
-
-function actionUrl(name: string): string {
-  const actionMap = actions as Record<string, string>;
-  return actionMap[`littlefarms-appbuilder/${name}`] || actionMap[name] || "";
 }
 
 function operatorsFor(input: string): string[][] {
@@ -768,20 +763,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
   const [editSection, setEditSection] = useState<BlockEditSection>("frontend-properties");
 
   async function invoke(name: string, params: Record<string, unknown>) {
-    const url = actionUrl(name);
-    if (!url) throw new Error(`Runtime action ${name} is not available. Run aio app dev so the action URL is generated.`);
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${ims.imsToken}`,
-        "Content-Type": "application/json",
-        "x-gw-ims-org-id": ims.imsOrgId,
-      },
-      body: JSON.stringify(params),
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || `Request failed with status ${response.status}.`);
-    return payload;
+    return invokeRuntimeAction(ims, name, params);
   }
 
   async function loadPresets() {
