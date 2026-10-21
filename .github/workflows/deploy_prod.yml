@@ -41,6 +41,8 @@ jobs:
           SCOPES: ${{ secrets.SCOPES }}
       - name: Build
         env:
+          NODE_ENV: production
+          BABEL_ENV: production
           AIO_RUNTIME_NAMESPACE: ${{ secrets.AIO_RUNTIME_NAMESPACE }}
         uses: adobe/aio-apps-action@4.1.0
         with:
