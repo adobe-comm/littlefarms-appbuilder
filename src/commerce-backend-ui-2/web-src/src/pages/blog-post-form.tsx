@@ -189,7 +189,7 @@ export function BlogPostEditor({
       try {
         const [categoryPage, tagPage, groupPage] = await Promise.all([
           invokeBlogAction<{ items: BlogTaxonomyItem[] }>(ims, "blog-category-list", { listAll: true }),
-          invokeBlogAction<{ items: BlogTaxonomyItem[] }>(ims, "blog-tag-list", {}),
+          invokeBlogAction<{ items: BlogTaxonomyItem[] }>(ims, "blog-tag-list", { listAll: true }),
           invokeBlogAction<{ items: CustomerGroupOption[] }>(ims, "blog-customer-groups", {}),
         ]);
         if (cancelled) return;

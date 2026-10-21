@@ -225,8 +225,8 @@ async function migrationStart (params, logger) {
     throw Object.assign(new Error('Location migration requires the locations CSV.'), { statusCode: 400 })
   }
   if (serviceId === 'blog') {
-    if (!datasets.categories && !datasets.posts) {
-      throw Object.assign(new Error('Blog migration requires categories and/or posts.'), { statusCode: 400 })
+    if (!datasets.categories && !datasets.tags && !datasets.posts) {
+      throw Object.assign(new Error('Blog migration requires categories, tags, and/or posts.'), { statusCode: 400 })
     }
     if (datasets.posts && !datasets.categories && !draft.files?.categories?.path) {
       throw Object.assign(

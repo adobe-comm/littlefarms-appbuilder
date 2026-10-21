@@ -55,17 +55,29 @@ function buildBrandImportOptions (job, csvTexts) {
   }
 }
 
-function buildBlogImportOptions (job, csvTexts) {
+function buildBlogImportFlags (job, csvTexts) {
   const datasets = job.datasets || {}
+  const importPosts = Boolean(datasets.posts)
+  const hasCategoryCsv = Boolean(csvTexts.categories)
+  const hasTagCsv = Boolean(csvTexts.tags)
+  return {
+    importCategories: Boolean(datasets.categories) || (importPosts && hasCategoryCsv),
+    importTags: Boolean(datasets.tags) || (importPosts && hasTagCsv),
+    importPosts
+  }
+}
+
+function buildBlogImportOptions (job, csvTexts) {
   const modeWrite = job.mode === 'write'
+  const flags = buildBlogImportFlags(job, csvTexts)
   return {
     apply: true,
     preferSdk: true,
     skipReportFile: true,
     updateAll: modeWrite,
-    importCategories: Boolean(datasets.categories),
-    importPosts: Boolean(datasets.posts),
+    ...flags,
     categoryCsvText: csvTexts.categories,
+    tagCsvText: csvTexts.tags,
     postCsvText: csvTexts.posts
   }
 }
@@ -97,11 +109,17 @@ async function runServiceImport (params, job, jobId, migrationState, logger) {
       throw new Error('Location migration requires a locations CSV upload.')
     }
     if (job.mode === 'write') {
+      const datasets = job.datasets || {}
       await migrationState.patchJob(jobId, {
         phase: 'cleanup',
-        progress: { done: 0, total: 1, label: 'Removing existing location data' }
+        progress: { done: 0, total: 1, label: 'Removing selected location data' }
       })
-      const cleanup = await clearLocationMigrationData(params)
+      const cleanup = await clearLocationMigrationData(params, {
+        locations: Boolean(datasets.locations),
+        services: Boolean(datasets.services),
+        team: Boolean(datasets.team),
+        gallery: Boolean(datasets.gallery)
+      })
       await migrationState.patchJob(jobId, {
         progress: { done: 1, total: 1, label: 'Cleanup complete' },
         summary: { cleanup }
@@ -118,15 +136,20 @@ async function runServiceImport (params, job, jobId, migrationState, logger) {
   }
 
   if (job.service === 'blog') {
-    if (!csvTexts.categories && !csvTexts.posts) {
+    if (!csvTexts.categories && !csvTexts.tags && !csvTexts.posts) {
       throw new Error('Blog migration requires at least one uploaded CSV.')
     }
     if (job.mode === 'write') {
+      const importFlags = buildBlogImportFlags(job, csvTexts)
       await migrationState.patchJob(jobId, {
         phase: 'cleanup',
-        progress: { done: 0, total: 1, label: 'Removing existing blog data' }
+        progress: { done: 0, total: 1, label: 'Removing selected blog data' }
       })
-      const cleanup = await clearBlogMigrationData(params)
+      const cleanup = await clearBlogMigrationData(params, {
+        categories: importFlags.importCategories,
+        tags: importFlags.importTags,
+        posts: importFlags.importPosts
+      })
       await migrationState.patchJob(jobId, {
         progress: { done: 1, total: 1, label: 'Cleanup complete' },
         summary: { cleanup }

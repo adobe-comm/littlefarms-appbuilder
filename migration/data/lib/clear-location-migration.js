@@ -2,28 +2,48 @@ const { openLocationDb } = require('../../../actions/location/lib/location-store
 const { openContentDb } = require('../../../actions/location/lib/content-store')
 
 /**
- * Remove location and linked content documents before a "write" migration.
- * Counters are kept; import bumps them after insert.
+ * Write-mode cleanup for location migration. Only deletes collections matching enabled datasets.
+ * @param {object} params — Runtime / DB params
+ * @param {{ locations?: boolean, services?: boolean, team?: boolean, gallery?: boolean }} scope
  */
-async function clearLocationMigrationData (params) {
-  const openedLocation = await openLocationDb(params)
-  try {
-    const locationResult = await openedLocation.locations.deleteMany({ type: 'location' })
+async function clearLocationMigrationData (params, scope = {}) {
+  const result = {
+    locationsRemoved: 0,
+    servicesRemoved: 0,
+    teamRemoved: 0,
+    galleryRemoved: 0
+  }
+
+  if (scope.locations) {
+    const openedLocation = await openLocationDb(params)
+    try {
+      const locationResult = await openedLocation.locations.deleteMany({ type: 'location' })
+      result.locationsRemoved = locationResult.deletedCount || 0
+    } finally {
+      await openedLocation.client.close()
+    }
+  }
+
+  const contentScopes = [
+    ['services', 'service', 'servicesRemoved'],
+    ['team', 'team', 'teamRemoved'],
+    ['gallery', 'gallery', 'galleryRemoved']
+  ]
+
+  const toDelete = contentScopes.filter(([key]) => scope[key])
+  if (toDelete.length) {
     const openedContent = await openContentDb(params)
     try {
-      const contentResult = await openedContent.collection.deleteMany({
-        type: { $in: ['service', 'team', 'gallery'] }
-      })
-      return {
-        locationsRemoved: locationResult.deletedCount || 0,
-        contentRemoved: contentResult.deletedCount || 0
+      for (const [, type, countKey] of toDelete) {
+        const deleteResult = await openedContent.collection.deleteMany({ type })
+        result[countKey] = deleteResult.deletedCount || 0
       }
     } finally {
       await openedContent.client.close()
     }
-  } finally {
-    await openedLocation.client.close()
   }
+
+  return result
 }
 
 module.exports = {

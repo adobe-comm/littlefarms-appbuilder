@@ -187,26 +187,142 @@ function buildCategoryTitleIndex (categoryRows) {
   return byTitle
 }
 
-function resolvePostCategoryIds ({ categoryNames, canonicalCategoryId, byLegacyId, csvTitleIndex }) {
+/**
+ * Post CSV: category_names (comma-separated titles) and optional canonical_category_id.
+ * Legacy Blog_category.csv id → taxonomyId in DB, so ids from the category CSV are trusted.
+ */
+function mapCsvRowToTagFields (row) {
+  const fields = {}
+  const skipped = []
+
+  const title = trimmed(row.name)
+  if (title) fields.title = title
+
+  const urlKey = trimmed(row.url_key)
+  if (urlKey) fields.url_key = urlKey
+
+  fields.is_active = true
+
+  for (const [csvKey, fieldKey] of [
+    ['meta_title', 'meta_title'],
+    ['meta_keywords', 'meta_keywords'],
+    ['meta_description', 'meta_description'],
+    ['meta_prefix', 'meta_prefix'],
+    ['meta_suffix', 'meta_suffix']
+  ]) {
+    const value = trimmed(row[csvKey])
+    if (value) fields[fieldKey] = value
+  }
+
+  if (!title) skipped.push('empty_row')
+
+  return { fields, skipped, legacyTagId: trimmed(row.id) }
+}
+
+function buildTagTitleIndex (tagRows) {
+  const byTitle = new Map()
+  for (const row of tagRows) {
+    const id = trimmed(row.id)
+    const title = trimmed(row.name).toLowerCase()
+    if (id && title) byTitle.set(title, id)
+  }
+  return byTitle
+}
+
+/** Legacy tag ids present in Blog_post_tag.csv (for numeric tokens in Blog.csv tag_names). */
+function buildTagLegacyIdSet (tagRows) {
+  const ids = new Set()
+  for (const row of tagRows) {
+    const id = trimmed(row.id)
+    if (id && /^\d+$/.test(id)) ids.add(id)
+  }
+  return ids
+}
+
+/** Legacy tag CSV post_ids column → postId → [tag legacy ids]. */
+function buildPostTagsFromTagExport (tagRows) {
+  const byPostId = new Map()
+  for (const row of tagRows) {
+    const tagLegacyId = trimmed(row.id)
+    if (!tagLegacyId) continue
+    for (const postId of splitCsvNames(row.post_ids)) {
+      if (!/^\d+$/.test(postId)) continue
+      const list = byPostId.get(postId) || []
+      if (!list.includes(tagLegacyId)) list.push(tagLegacyId)
+      byPostId.set(postId, list)
+    }
+  }
+  return byPostId
+}
+
+function mergeTaxonomyIdLists (...lists) {
+  const out = []
+  const seen = new Set()
+  for (const list of lists) {
+    for (const raw of list || []) {
+      const id = String(raw).trim()
+      if (!id || id === '0' || seen.has(id)) continue
+      seen.add(id)
+      out.push(id)
+    }
+  }
+  return out
+}
+
+function resolvePostTagIds ({ tagNames, byLegacyId, csvTitleIndex, csvLegacyIds }) {
   const ids = []
   const seen = new Set()
   const add = (rawId) => {
     const id = String(rawId).trim()
-    if (!id || seen.has(id)) return
-    if (!byLegacyId.has(Number(id))) return
+    if (!id || id === '0' || seen.has(id)) return
+    seen.add(id)
+    ids.push(id)
+  }
+
+  for (const name of tagNames) {
+    if (/^\d+$/.test(name)) {
+      if (csvLegacyIds?.has(name) || byLegacyId.has(Number(name))) {
+        add(name)
+      }
+      continue
+    }
+    const fromCsv = csvTitleIndex.get(name.toLowerCase())
+    if (fromCsv) {
+      add(fromCsv)
+      continue
+    }
+    for (const [taxonomyId, doc] of byLegacyId.entries()) {
+      if (trimmed(doc.title).toLowerCase() === name.toLowerCase()) {
+        add(taxonomyId)
+        break
+      }
+    }
+  }
+
+  return ids
+}
+
+function resolvePostCategoryIds ({ categoryNames, canonicalCategoryId, byLegacyId, csvTitleIndex }) {
+  const ids = []
+  const seen = new Set()
+  const add = (rawId, { requireInDb = false } = {}) => {
+    const id = String(rawId).trim()
+    if (!id || id === '0' || seen.has(id)) return
+    if (requireInDb && !byLegacyId.has(Number(id))) return
     seen.add(id)
     ids.push(id)
   }
 
   for (const name of categoryNames) {
     const fromCsv = csvTitleIndex.get(name.toLowerCase())
-    if (fromCsv) add(fromCsv)
-    else {
-      for (const [legacyId, doc] of byLegacyId.entries()) {
-        if (trimmed(doc.title).toLowerCase() === name.toLowerCase()) {
-          add(legacyId)
-          break
-        }
+    if (fromCsv) {
+      add(fromCsv)
+      continue
+    }
+    for (const [taxonomyId, doc] of byLegacyId.entries()) {
+      if (trimmed(doc.title).toLowerCase() === name.toLowerCase()) {
+        add(taxonomyId)
+        break
       }
     }
   }
@@ -236,9 +352,15 @@ function stripLegacyBlogMediaUrls (fields) {
 
 module.exports = {
   mapCsvRowToCategoryFields,
+  mapCsvRowToTagFields,
   mapCsvRowToPostFields,
   buildCategoryTitleIndex,
+  buildTagTitleIndex,
+  buildTagLegacyIdSet,
+  buildPostTagsFromTagExport,
+  mergeTaxonomyIdLists,
   resolvePostCategoryIds,
+  resolvePostTagIds,
   hasImportableFields,
   stripLegacyBlogMediaUrls,
   splitCsvNames

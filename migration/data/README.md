@@ -77,14 +77,14 @@ Legacy Aheadworks Blog exports under `stage/`. The importer maps into `littlefar
 | File | Description |
 |------|-------------|
 | `stage/Blog_category.csv` | Categories (Recipes, Guides, Stories, …) |
+| `stage/Blog_post_tag.csv` | Tags (`post_ids` links posts; legacy `id` → `taxonomyId`) |
 | `stage/Blog.csv` | Posts |
-| *(future)* tag export | Tags — **`tag_names` on posts are not imported yet** |
 
 ## Join / identity
 
 - **Categories:** legacy CSV `id` → `taxonomyId` (upsert by legacy id).
 - **Posts:** legacy CSV `id` → `postId`. **`category_names`** (comma-separated titles) resolve to `category_ids` using the category CSV and/or categories already in DB — run **`--import-categories` before `--import-posts`** (or in the same apply pass with categories first).
-- **Tags:** deferred until a tag CSV importer is added; posts import with `tag_ids: []` and the plan reports rows that had `tag_names`.
+- **Tags:** legacy CSV `id` → `taxonomyId`. Post **`tag_ids`** merge **`Blog_post_tag.csv` `post_ids`** with **`Blog.csv` `tag_names`** (title lookup). Import tags before or with posts (Settings: enable **Tags** dataset, upload `Blog_post_tag.csv`).
 
 ## Field notes
 

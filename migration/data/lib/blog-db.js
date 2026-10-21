@@ -3,6 +3,7 @@ const libDb = require('@adobe/aio-lib-db')
 const {
   POSTS_COLLECTION,
   CATEGORIES_COLLECTION,
+  TAGS_COLLECTION,
   CATEGORY_DISPLAY_MODES
 } = require('../../../actions/blog/lib/constants')
 const {
@@ -12,11 +13,14 @@ const {
   aioReplaceDocument,
   stripInternalFields,
   BLOG_POSTS_COLLECTION,
-  BLOG_CATEGORIES_COLLECTION
+  BLOG_CATEGORIES_COLLECTION,
+  BLOG_TAGS_COLLECTION
 } = require('./aio-db-cli')
+const { slugify, uniqueSlug } = require('../../../actions/blog/lib/slug')
 
 const BLOG_POST_COUNTER_ID = 'blog-post-counter'
 const BLOG_CATEGORY_COUNTER_ID = 'blog-category-counter'
+const BLOG_TAG_COUNTER_ID = 'blog-tag-counter'
 const READ_BATCH = 100
 const DEFAULT_PROGRESS_EVERY = 25
 
@@ -57,13 +61,52 @@ async function openBlogCategoriesDb (params) {
   return { client, collection }
 }
 
+async function openBlogTagsDb (params) {
+  const token = await Core.AuthClient.generateAccessToken(params)
+  const db = await libDb.init({
+    token: token.access_token,
+    region: params.DB_REGION || 'amer'
+  })
+  const client = await db.connect()
+  const collection = await ensureCollection(client, TAGS_COLLECTION)
+  return { client, collection }
+}
+
 function indexCategories (docs) {
   const byLegacyId = new Map()
+  const byUrlKey = new Map()
   for (const doc of docs) {
     if (doc.type !== 'blog_category') continue
     byLegacyId.set(Number(doc.taxonomyId), doc)
+    const urlKey = trimmed(doc.url_key).toLowerCase()
+    if (urlKey && !byUrlKey.has(urlKey)) byUrlKey.set(urlKey, doc)
   }
-  return byLegacyId
+  return { byLegacyId, byUrlKey }
+}
+
+function indexTags (docs) {
+  const byLegacyId = new Map()
+  const byUrlKey = new Map()
+  for (const doc of docs) {
+    if (doc.type !== 'blog_tag') continue
+    byLegacyId.set(Number(doc.taxonomyId), doc)
+    const urlKey = trimmed(doc.url_key).toLowerCase()
+    if (urlKey && !byUrlKey.has(urlKey)) byUrlKey.set(urlKey, doc)
+  }
+  return { byLegacyId, byUrlKey }
+}
+
+function findTaxonomyByLegacyOrUrlKey ({ byLegacyId, byUrlKey }, legacyId, urlKey) {
+  const byId = byLegacyId.get(Number(legacyId))
+  if (byId) return byId
+  const normalized = trimmed(urlKey).toLowerCase()
+  if (!normalized) return undefined
+  return byUrlKey.get(normalized)
+}
+
+function isDuplicateKeyError (error) {
+  const message = String(error?.message || error || '')
+  return message.includes('E11000') || message.includes('duplicate key') || message.includes('code 409')
 }
 
 function indexPosts (docs) {
@@ -79,7 +122,7 @@ async function loadCategoriesViaSdk (params) {
   const opened = await openBlogCategoriesDb(params)
   try {
     const docs = await opened.collection.find({ type: 'blog_category' }).toArray()
-    return { docs, byLegacyId: indexCategories(docs) }
+    return { docs, ...indexCategories(docs) }
   } finally {
     await opened.client.close()
   }
@@ -94,7 +137,29 @@ async function loadCategories (params, { preferSdk = false } = {}) {
     }
   }
   const docs = loadDocumentsViaCli(BLOG_CATEGORIES_COLLECTION, { type: 'blog_category' })
-  return { docs, byLegacyId: indexCategories(docs) }
+  return { docs, ...indexCategories(docs) }
+}
+
+async function loadTagsViaSdk (params) {
+  const opened = await openBlogTagsDb(params)
+  try {
+    const docs = await opened.collection.find({ type: 'blog_tag' }).toArray()
+    return { docs, ...indexTags(docs) }
+  } finally {
+    await opened.client.close()
+  }
+}
+
+async function loadTags (params, { preferSdk = false } = {}) {
+  if (preferSdk) {
+    try {
+      return await loadTagsViaSdk(params)
+    } catch (error) {
+      console.warn(`SDK tag read failed (${error.message}). Falling back to aio CLI.`)
+    }
+  }
+  const docs = loadDocumentsViaCli(BLOG_TAGS_COLLECTION, { type: 'blog_tag' })
+  return { docs, ...indexTags(docs) }
 }
 
 async function loadPostsViaSdk (params) {
@@ -163,6 +228,72 @@ function normalizeCategoryRecord (rawFields) {
   }
 }
 
+function collectTakenTagUrlKeys (docs) {
+  const taken = new Set()
+  for (const doc of docs || []) {
+    if (doc?.type !== 'blog_tag') continue
+    const key = trimmed(doc.url_key).toLowerCase()
+    if (key) taken.add(key)
+  }
+  return taken
+}
+
+function assignUniqueTagUrlKey (document, takenUrlKeys) {
+  const taken = takenUrlKeys || new Set()
+  const title = trimmed(document.title)
+  let urlKey = trimmed(document.url_key)
+  if (urlKey) {
+    urlKey = slugify(urlKey)
+    if (!urlKey) urlKey = uniqueSlug(title, taken)
+    else if (taken.has(urlKey.toLowerCase())) urlKey = uniqueSlug(urlKey, taken)
+  } else {
+    urlKey = uniqueSlug(title, taken)
+  }
+  taken.add(urlKey.toLowerCase())
+  return { ...document, url_key: urlKey.slice(0, 255) }
+}
+
+function normalizeTagRecord (rawFields) {
+  return {
+    title: trimmed(rawFields.title).slice(0, 255),
+    url_key: trimmed(rawFields.url_key).slice(0, 255),
+    is_active: rawFields.is_active !== false,
+    meta_title: trimmed(rawFields.meta_title).slice(0, 255),
+    meta_keywords: trimmed(rawFields.meta_keywords).slice(0, 500),
+    meta_description: trimmed(rawFields.meta_description).slice(0, 500),
+    meta_prefix: trimmed(rawFields.meta_prefix).slice(0, 255),
+    meta_suffix: trimmed(rawFields.meta_suffix).slice(0, 255)
+  }
+}
+
+function buildTagDocument (legacyTagId, rawFields, existing) {
+  const taxonomyId = Number(legacyTagId)
+  if (!Number.isInteger(taxonomyId) || taxonomyId <= 0) {
+    throw new Error(`Invalid legacy tag id: ${legacyTagId}`)
+  }
+  const now = new Date().toISOString()
+  const record = normalizeTagRecord(rawFields)
+  if (!record.title) throw new Error(`Tag ${taxonomyId} requires a title.`)
+  if (existing) {
+    return {
+      ...existing,
+      ...record,
+      id: `tag:${taxonomyId}`,
+      type: 'blog_tag',
+      taxonomyId,
+      updatedAt: now
+    }
+  }
+  return {
+    id: `tag:${taxonomyId}`,
+    type: 'blog_tag',
+    taxonomyId,
+    ...record,
+    createdAt: now,
+    updatedAt: now
+  }
+}
+
 function buildCategoryDocument (legacyCategoryId, rawFields, existing) {
   const taxonomyId = Number(legacyCategoryId)
   if (!Number.isInteger(taxonomyId) || taxonomyId <= 0) {
@@ -172,7 +303,14 @@ function buildCategoryDocument (legacyCategoryId, rawFields, existing) {
   const record = normalizeCategoryRecord(rawFields)
   if (!record.title) throw new Error(`Category ${taxonomyId} requires a title.`)
   if (existing) {
-    return { ...existing, ...record, updatedAt: now }
+    return {
+      ...existing,
+      ...record,
+      id: `cat:${taxonomyId}`,
+      type: 'blog_category',
+      taxonomyId,
+      updatedAt: now
+    }
   }
   return {
     id: `cat:${taxonomyId}`,
@@ -245,6 +383,17 @@ function buildPostDocument (legacyPostId, rawFields, existing) {
   }
 }
 
+function tagUpsertSet (existing, document) {
+  const set = { updatedAt: document.updatedAt }
+  for (const key of [
+    'title', 'url_key', 'is_active',
+    'meta_title', 'meta_keywords', 'meta_description', 'meta_prefix', 'meta_suffix'
+  ]) {
+    if (document[key] !== undefined) set[key] = document[key]
+  }
+  return set
+}
+
 function categoryUpsertSet (existing, document) {
   const set = { updatedAt: document.updatedAt }
   for (const key of [
@@ -285,16 +434,27 @@ function reportProgress (onProgress, done, total, item, verbose, progressEvery) 
 
 async function upsertDocumentsViaSdk (params, collectionOpener, upserts, upsertSetFn, options = {}) {
   const opened = await collectionOpener(params)
+  const documentType = options.documentType
   try {
     let written = 0
     const total = upserts.length
     const { onProgress, progressEvery = DEFAULT_PROGRESS_EVERY, verbose = false } = options
     for (const item of upserts) {
+      const document = stripInternalFields(item.document)
       if (item.existing) {
-        const set = upsertSetFn(item.existing, item.document)
-        await opened.collection.updateOne({ id: item.existing.id }, { $set: set })
+        await opened.collection.replaceOne({ id: item.existing.id }, document)
       } else {
-        await opened.collection.insertOne(stripInternalFields(item.document))
+        try {
+          await opened.collection.insertOne(document)
+        } catch (error) {
+          if (!isDuplicateKeyError(error) || !document.url_key || !documentType) throw error
+          const found = await opened.collection.findOne({
+            type: documentType,
+            url_key: document.url_key
+          })
+          if (!found) throw error
+          await opened.collection.replaceOne({ id: found.id }, document)
+        }
       }
       written += 1
       reportProgress(onProgress, written, total, item, verbose, progressEvery)
@@ -325,6 +485,25 @@ function upsertDocumentsViaCli (collectionName, upserts, upsertSetFn, options = 
   return written
 }
 
+async function upsertTags (params, upserts, options = {}) {
+  const { preferSdk = false } = options
+  if (preferSdk) {
+    try {
+      return await upsertDocumentsViaSdk(
+        params,
+        openBlogTagsDb,
+        upserts,
+        tagUpsertSet,
+        { ...options, documentType: 'blog_tag' }
+      )
+    } catch (error) {
+      if (options.preferSdk) throw error
+      console.warn(`SDK tag write failed (${error.message}). Falling back to aio CLI.`)
+    }
+  }
+  return upsertDocumentsViaCli(BLOG_TAGS_COLLECTION, upserts, tagUpsertSet, options)
+}
+
 async function upsertCategories (params, upserts, options = {}) {
   const { preferSdk = false } = options
   if (preferSdk) {
@@ -334,9 +513,10 @@ async function upsertCategories (params, upserts, options = {}) {
         openBlogCategoriesDb,
         upserts,
         categoryUpsertSet,
-        options
+        { ...options, documentType: 'blog_category' }
       )
     } catch (error) {
+      if (options.preferSdk) throw error
       console.warn(`SDK category write failed (${error.message}). Falling back to aio CLI.`)
     }
   }
@@ -352,9 +532,10 @@ async function upsertPosts (params, upserts, options = {}) {
         openBlogPostsDb,
         upserts,
         postUpsertSet,
-        options
+        { ...options, documentType: 'blog_post' }
       )
     } catch (error) {
+      if (options.preferSdk) throw error
       console.warn(`SDK post write failed (${error.message}). Falling back to aio CLI.`)
     }
   }
@@ -390,6 +571,35 @@ async function bumpCategoryCounter (params, minimumNextId, { preferSdk = false }
   else aioInsertDocuments(BLOG_CATEGORIES_COLLECTION, counterDoc)
 }
 
+async function bumpTagCounter (params, minimumNextId, { preferSdk = false } = {}) {
+  const nextId = Math.max(1, Number(minimumNextId) || 1)
+  if (preferSdk) {
+    const opened = await openBlogTagsDb(params)
+    try {
+      const existing = await opened.collection.findOne({ id: BLOG_TAG_COUNTER_ID })
+      const counterDoc = {
+        id: BLOG_TAG_COUNTER_ID,
+        type: 'counter',
+        nextId: Math.max(Number(existing?.nextId) || 1, nextId)
+      }
+      if (existing) await opened.collection.replaceOne({ id: BLOG_TAG_COUNTER_ID }, counterDoc)
+      else await opened.collection.insertOne(counterDoc)
+      return
+    } finally {
+      await opened.client.close()
+    }
+  }
+  const filter = { id: BLOG_TAG_COUNTER_ID }
+  const existing = loadDocumentsViaCli(BLOG_TAGS_COLLECTION, filter)[0]
+  const counterDoc = {
+    id: BLOG_TAG_COUNTER_ID,
+    type: 'counter',
+    nextId: Math.max(Number(existing?.nextId) || 1, nextId)
+  }
+  if (existing) aioReplaceDocument(BLOG_TAGS_COLLECTION, filter, counterDoc)
+  else aioInsertDocuments(BLOG_TAGS_COLLECTION, counterDoc)
+}
+
 async function bumpPostCounter (params, minimumNextId, { preferSdk = false } = {}) {
   const nextId = Math.max(1, Number(minimumNextId) || 1)
   if (preferSdk) {
@@ -419,6 +629,10 @@ async function bumpPostCounter (params, minimumNextId, { preferSdk = false } = {
   else aioInsertDocuments(BLOG_POSTS_COLLECTION, counterDoc)
 }
 
+function tagComparable (doc) {
+  return JSON.stringify(normalizeTagRecord(doc))
+}
+
 function categoryComparable (doc) {
   return JSON.stringify(normalizeCategoryRecord({
     title: doc.title,
@@ -446,16 +660,25 @@ function postComparable (doc) {
 
 module.exports = {
   openBlogCategoriesDb,
+  openBlogTagsDb,
   openBlogPostsDb,
+  assignUniqueTagUrlKey,
+  collectTakenTagUrlKeys,
+  findTaxonomyByLegacyOrUrlKey,
   loadCategories,
+  loadTags,
   loadPosts,
   upsertCategories,
+  upsertTags,
   upsertPosts,
   bumpCategoryCounter,
+  bumpTagCounter,
   bumpPostCounter,
   buildCategoryDocument,
+  buildTagDocument,
   buildPostDocument,
   categoryComparable,
+  tagComparable,
   postComparable,
   DEFAULT_PROGRESS_EVERY
 }
