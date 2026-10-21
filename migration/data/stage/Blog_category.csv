@@ -1,0 +1,6 @@
+"id","name","url_key","status","sort_order","created_at","updated_at","meta_title","meta_keywords","meta_description","meta_prefix","meta_suffix","parent_id","path","image_file_name","image_title","image_alt","is_description_enabled","description","display_mode","cms_block_id","parent_name","store_codes","cms_block_identifier","cms_block_title","image_url"
+3,Recipes,recipes,1,0,"2020-12-30 12:41:01","2020-12-30 12:41:01","","","","","",0,"3","","","",1,"<p>Colourful recipes and useful tips, featuring seasonal and natural ingredients.</p>",blog_posts_only,,,default,,,
+18,Events,events,1,0,"2023-09-11 05:49:51","2023-09-11 05:49:51","","","","","",0,"18","","","",0,"",blog_posts_only,,,default,,,
+21,We Care,little-farms-we-care,1,0,"2023-09-12 03:13:01","2023-09-12 03:13:01","","","","","",0,"21","","","",0,"",blog_posts_only,,,default,,,
+9,Guides,guides,1,10,"2020-12-30 12:41:30","2020-12-30 12:41:30","","","","","",0,"9","","","",1,"<p>Our pocket-sized guides to good eating, drinking and living.</p>",blog_posts_only,,,default,,,
+6,Stories,stories,1,20,"2020-12-30 12:41:19","2020-12-30 12:41:19","","","","","",0,"6","","","",1,<p>The faces and places behind the foods on our shelves.</p>,blog_posts_only,,,default,,,

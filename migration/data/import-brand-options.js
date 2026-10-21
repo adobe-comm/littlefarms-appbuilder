@@ -15,7 +15,7 @@ const path = require('path')
 
 const { normalizeName } = require('../../actions/brand/lib/slug')
 const { createBrandCache } = require('../../actions/brand/lib/brand-cache')
-const { readCsv } = require('./lib/parse-csv')
+const { readCsv, parseCsv } = require('./lib/parse-csv')
 const { loadRuntimeParams } = require('./lib/load-params')
 const { mapCsvRowToBrandFields, hasImportableFields, fieldDiff, stripLegacyMediaFilenames } = require('./lib/map-csv-row')
 const { loadBaseBrands, applyBrandPatches, DEFAULT_PROGRESS_EVERY } = require('./lib/brand-db')
@@ -38,6 +38,8 @@ function parseArgs (argv) {
     mediaBase: DEFAULT_MEDIA_BASE,
     progressEvery: DEFAULT_PROGRESS_EVERY,
     verbose: false,
+    csvText: '',
+    skipReportFile: false,
     help: false
   }
 
@@ -85,18 +87,17 @@ function ensureOutDir () {
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true })
 }
 
-async function main () {
-  const options = parseArgs(process.argv)
-  if (options.help) {
-    printHelp()
-    return
-  }
+function loadBrandRows (options) {
+  const text = String(options.csvText || '').trim()
+  if (text) return parseCsv(text)
+  if (options.csv && fs.existsSync(options.csv)) return readCsv(options.csv)
+  throw new Error(`CSV not found${options.csv ? `: ${options.csv}` : ''}.`)
+}
 
-  if (!fs.existsSync(options.csv)) {
-    throw new Error(`CSV not found: ${options.csv}`)
-  }
+async function runBrandImport (params, options, hooks = {}) {
+  const onPhase = typeof hooks.onPhase === 'function' ? hooks.onPhase : () => {}
 
-  const rows = readCsv(options.csv)
+  const rows = loadBrandRows(options)
   const attributeCodes = [...new Set(rows.map(row => String(row.attribute_code || '').trim()).filter(Boolean))]
   const attributeCode = options.attributeCode ||
     (attributeCodes.length === 1 ? attributeCodes[0] : '') ||
@@ -106,7 +107,9 @@ async function main () {
     throw new Error(`CSV has multiple attribute_code values (${attributeCodes.join(', ')}). Pass --attribute.`)
   }
 
-  const params = loadRuntimeParams({ withIms: options.preferSdk })
+  if (!params) {
+    params = loadRuntimeParams({ withIms: options.preferSdk })
+  }
   if (options.preferSdk && params.imsCredentialSource) {
     console.log(`IMS credentials: ${params.imsCredentialSource} (server-to-server token for DB SDK)`)
   }
@@ -209,10 +212,13 @@ async function main () {
     if (plan.samples.length < 5) plan.samples.push(entry)
   }
 
-  ensureOutDir()
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const reportPath = path.join(OUT_DIR, `brand-import-plan-${stamp}.json`)
-  fs.writeFileSync(reportPath, JSON.stringify(plan, null, 2))
+  let reportPath = null
+  if (!options.skipReportFile) {
+    ensureOutDir()
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    reportPath = path.join(OUT_DIR, `brand-import-plan-${stamp}.json`)
+    fs.writeFileSync(reportPath, JSON.stringify(plan, null, 2))
+  }
 
   console.log(`Attribute: ${attributeCode}`)
   console.log(`CSV rows: ${plan.csvRows} | DB brands: ${plan.dbBrands}`)
@@ -225,16 +231,27 @@ async function main () {
   if (plan.unmatchedCsvNames.length) {
     console.log(`Unmatched CSV names: ${plan.unmatchedCsvNames.length} (see report)`)
   }
-  console.log(`Report: ${reportPath}`)
+  if (reportPath) console.log(`Report: ${reportPath}`)
+
+  const summary = {
+    mode: plan.mode,
+    attributeCode,
+    wouldUpdate: plan.wouldUpdate,
+    csvRows: plan.csvRows,
+    matchedByName: plan.matchedByName,
+    unmatchedCsvNames: plan.unmatchedCsvNames.length,
+    reportPath
+  }
 
   if (!options.apply) {
     console.log('\nDry run only. Re-run with --apply to write changes.')
-    return
+    return summary
   }
 
   if (!plan.wouldUpdate) {
     console.log('Nothing to apply.')
-    return
+    summary.applied = 0
+    return summary
   }
 
   let toApply = pending
@@ -242,12 +259,18 @@ async function main () {
 
   const total = toApply.length
   console.log(`\nApplying ${total} brand update(s)...`)
+  onPhase('brands', { done: 0, total, label: 'Brand options' })
 
   const updated = await applyBrandPatches(params, toApply, {
     preferSdk: options.preferSdk,
     progressEvery: options.progressEvery,
     verbose: options.verbose,
     onProgress: ({ done, total: goal, item }) => {
+      onPhase('brands', {
+        done,
+        total: goal,
+        label: item?.base?.optionLabel || 'Brand options'
+      })
       if (item?.base?.optionLabel && options.verbose) {
         console.log(`  ${done}/${goal} — ${item.base.optionLabel} (${item.base.optionValue})`)
         return
@@ -270,9 +293,26 @@ async function main () {
   if (options.limit > 0 && pending.length > options.limit) {
     console.log(`Stopped at --limit ${options.limit}; ${pending.length - options.limit} remaining.`)
   }
+  summary.applied = updated
+  return summary
 }
 
-main().catch(error => {
-  console.error(error.message || error)
-  process.exit(1)
-})
+async function main () {
+  const options = parseArgs(process.argv)
+  if (options.help) {
+    printHelp()
+    return
+  }
+  await runBrandImport(undefined, options)
+}
+
+if (require.main === module) {
+  main().catch(error => {
+    console.error(error.message || error)
+    process.exit(1)
+  })
+}
+
+module.exports = {
+  runBrandImport
+}

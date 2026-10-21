@@ -85,6 +85,37 @@ function mapLocationGeneral (entry) {
   }
 }
 
+function mapLocationService (item) {
+  if (!item || item.serviceId == null) return null
+  return {
+    serviceId: Number(item.serviceId),
+    title: item.title || '',
+    serviceUrl: item.serviceUrl || '',
+    icon: item.icon || ''
+  }
+}
+
+function mapLocationGallery (item) {
+  if (!item || item.galleryId == null) return null
+  return {
+    galleryId: Number(item.galleryId),
+    title: item.title || '',
+    image: item.image || '',
+    imageAlt: item.imageAlt || ''
+  }
+}
+
+function mapLocationTeamProfile (item) {
+  if (!item || item.profileId == null) return null
+  return {
+    profileId: Number(item.profileId),
+    name: item.name || '',
+    jobTitle: item.jobTitle || '',
+    image: item.image || '',
+    sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : 0
+  }
+}
+
 function mapLocation (entry) {
   if (!entry || entry.locationId == null) return null
   return {
@@ -116,12 +147,12 @@ function mapLocation (entry) {
     longitude: entry.longitude || '',
     storeBanner: entry.storeBanner || '',
     travelSuggestion: entry.travelSuggestion || '',
-    services: Array.isArray(entry.services) ? entry.services.filter(Boolean) : [],
+    services: (entry.services || []).map(mapLocationService).filter(Boolean),
     storeContent: entry.storeContent || '',
-    galleries: Array.isArray(entry.galleries) ? entry.galleries.filter(Boolean) : [],
+    galleries: (entry.galleries || []).map(mapLocationGallery).filter(Boolean),
     galleryTitle: entry.galleryTitle || '',
     galleryDescription: entry.galleryDescription || '',
-    teamProfiles: Array.isArray(entry.teamProfiles) ? entry.teamProfiles.filter(Boolean) : [],
+    teamProfiles: (entry.teamProfiles || []).map(mapLocationTeamProfile).filter(Boolean),
     promotions: entry.promotions || '',
     isStore: entry.isStore === true,
     storeHours: mapWeekHours(entry.storeHours),

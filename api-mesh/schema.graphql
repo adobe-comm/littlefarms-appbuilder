@@ -210,6 +210,28 @@ type LittleFarmsWeekHours {
   sunday: LittleFarmsDayHours!
 }
 
+type LittleFarmsLocationService {
+  serviceId: Int!
+  title: String!
+  serviceUrl: String!
+  icon: String
+}
+
+type LittleFarmsLocationGalleryItem {
+  galleryId: Int!
+  title: String!
+  image: String
+  imageAlt: String
+}
+
+type LittleFarmsLocationTeamProfile {
+  profileId: Int!
+  name: String!
+  jobTitle: String!
+  image: String
+  sortOrder: Int!
+}
+
 type LittleFarmsLocation {
   locationId: Int!
   title: String!
@@ -239,12 +261,12 @@ type LittleFarmsLocation {
   longitude: String
   storeBanner: String
   travelSuggestion: String
-  services: [String!]!
+  services: [LittleFarmsLocationService!]!
   storeContent: String
-  galleries: [String!]!
+  galleries: [LittleFarmsLocationGalleryItem!]!
   galleryTitle: String
   galleryDescription: String
-  teamProfiles: [String!]!
+  teamProfiles: [LittleFarmsLocationTeamProfile!]!
   promotions: String
   isStore: Boolean!
   storeHours: LittleFarmsWeekHours!

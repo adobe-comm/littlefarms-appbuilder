@@ -2,8 +2,7 @@ web: web-src
 
 # The [pre-app-build] hooks are auto-generated. Do not remove or manually edit.
 hooks:
-  pre-app-build: >-
-    EXTENSION=backend-ui/2 npx aio-commerce-lib-app hooks pre-app-build && node -e "require('fs').rmSync('src/commerce-backend-ui-2/web-src/.babelrc', {force:true})"
+  pre-app-build: EXTENSION=backend-ui/2 npx aio-commerce-lib-app hooks pre-app-build
   pre-app-dev: EXTENSION=backend-ui/2 npx aio-commerce-lib-app hooks pre-app-dev
   pre-app-run: EXTENSION=backend-ui/2 npx aio-commerce-lib-app hooks pre-app-run
 
@@ -164,21 +163,23 @@ runtimeManifest:
           runtime: nodejs:22
           inputs:
             <<: *admin-inputs
-            COMMERCE_CORE_GRAPHQL_URL: $COMMERCE_CORE_GRAPHQL_URL
-            MAGENTO_STORE_CODE: $MAGENTO_STORE_CODE
-            MAGENTO_WEBSITE_CODE: $MAGENTO_WEBSITE_CODE
-            MAGENTO_ENVIRONMENT_ID: $MAGENTO_ENVIRONMENT_ID
-            MAGENTO_CUSTOMER_GROUP: $MAGENTO_CUSTOMER_GROUP
-            MAGENTO_API_KEY: $MAGENTO_API_KEY
-            IMS_ORG_ID: $IMS_ORG_ID
-            IMS_CLIENT_ID: $IMS_CLIENT_ID
-            IMS_CLIENT_SECRETS: $IMS_CLIENT_SECRETS
-            IMS_SCOPES: $IMS_SCOPES
           limits:
             timeout: 60000
             memorySize: 512
           annotations:
             <<: *admin-annotations
+        process-data:
+          function: ../../actions/process-data/index.js
+          web: 'no'
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 1800000
+            memorySize: 512
+          annotations:
+            final: true
+            include-ims-credentials: true
         attribute-sync:
           function: ../../actions/block/attribute-sync/index.js
           web: 'no'

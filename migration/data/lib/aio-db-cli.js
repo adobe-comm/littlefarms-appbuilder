@@ -95,6 +95,9 @@ async function loadBaseBrandsViaCli (attributeCode) {
 
 const LOCATIONS_COLLECTION = 'littlefarms_locations'
 const LOCATION_CONTENT_COLLECTION = 'littlefarms_location_content'
+const BLOG_POSTS_COLLECTION = 'littlefarms_blog_posts'
+const BLOG_CATEGORIES_COLLECTION = 'littlefarms_blog_categories'
+const BLOG_TAGS_COLLECTION = 'littlefarms_blog_tags'
 
 function loadDocumentsViaCli (collection, filter) {
   const docs = []
@@ -117,5 +120,8 @@ module.exports = {
   stripInternalFields,
   BRANDS_COLLECTION,
   LOCATIONS_COLLECTION,
-  LOCATION_CONTENT_COLLECTION
+  LOCATION_CONTENT_COLLECTION,
+  BLOG_POSTS_COLLECTION,
+  BLOG_CATEGORIES_COLLECTION,
+  BLOG_TAGS_COLLECTION
 }

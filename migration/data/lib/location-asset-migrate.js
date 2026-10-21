@@ -224,6 +224,42 @@ async function migrateTeamImageFromCsv ({
   }
 }
 
+async function migrateGalleryImageFromCsv ({
+  row,
+  galleryId,
+  mediaBase,
+  dryRun,
+  assetUploader,
+  cache
+}) {
+  const relativePath = trimmed(row.gallery)
+  if (!relativePath) return { assets: [], fieldUpdates: {} }
+
+  const sourceUrl = legacyLocationMediaUrl(relativePath, mediaBase)
+  if (dryRun) {
+    return {
+      assets: [{ field: 'image', relativePath, sourceUrl, dryRun: true }],
+      fieldUpdates: {}
+    }
+  }
+
+  const result = await migrateLocationAsset({
+    locationKey: '',
+    relativePath,
+    field: 'image',
+    kind: 'galleryImage',
+    mediaBase,
+    assetUploader,
+    cache,
+    contentId: galleryId
+  })
+  const fieldUpdates = result.url ? { image: result.url } : {}
+  return {
+    assets: [{ field: 'image', relativePath, ...result }],
+    fieldUpdates
+  }
+}
+
 async function migrateServiceIconFromCsv ({
   row,
   serviceId,
@@ -263,6 +299,7 @@ async function migrateServiceIconFromCsv ({
 module.exports = {
   initLocationAssetUploader,
   applyLocationAssetFieldsFromCsv,
+  migrateGalleryImageFromCsv,
   migrateServiceIconFromCsv,
   migrateTeamImageFromCsv,
   LOCATION_ASSET_JOBS

@@ -15,7 +15,6 @@ import "hugerte/plugins/image";
 import "hugerte/plugins/table";
 import "hugerte/plugins/charmap";
 import "hugerte/plugins/code";
-import "hugerte/plugins/help";
 
 const TOOLBAR = [
   "undo redo",
@@ -46,10 +45,8 @@ export function HtmlEditor({
   hint?: string;
 }) {
   const [source, setSource] = useState(false);
-  const [seed, setSeed] = useState(value);
 
   function toggleSource() {
-    if (source) setSeed(value);
     setSource(current => !current);
   }
 
@@ -72,7 +69,7 @@ export function HtmlEditor({
       ) : (
         <Editor
           id={id}
-          initialValue={seed}
+          value={value}
           onEditorChange={onChange}
           init={{
             height: 480,
@@ -80,7 +77,7 @@ export function HtmlEditor({
             branding: true,
             promotion: false,
             statusbar: true,
-            plugins: ["advlist", "autolink", "lists", "link", "image", "table", "charmap", "code", "help"],
+            plugins: ["advlist", "autolink", "lists", "link", "image", "table", "charmap", "code"],
             toolbar: TOOLBAR,
             skin_url: "default",
             content_css: "default",
