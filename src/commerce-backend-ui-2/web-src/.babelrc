@@ -1,7 +1,7 @@
 {
-  "presets": [
+  "plugins": [
     [
-      "@babel/preset-react",
+      "@babel/plugin-transform-react-jsx",
       {
         "runtime": "automatic",
         "development": false
@@ -10,9 +10,9 @@
   ],
   "env": {
     "development": {
-      "presets": [
+      "plugins": [
         [
-          "@babel/preset-react",
+          "@babel/plugin-transform-react-jsx",
           {
             "runtime": "automatic",
             "development": true
