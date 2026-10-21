@@ -34,6 +34,12 @@ const BLOG_DATASETS = {
     description: 'Blog categories (Blog_category.csv)',
     fileKind: 'categories'
   },
+  tags: {
+    id: 'tags',
+    label: 'Tags',
+    description: 'Blog tags (Blog_post_tag.csv)',
+    fileKind: 'tags'
+  },
   posts: {
     id: 'posts',
     label: 'Posts',
@@ -71,14 +77,14 @@ const SERVICES = {
     label: 'Blog',
     allowWrite: true,
     datasets: BLOG_DATASETS,
-    phases: ['cleanup', 'categories', 'posts']
+    phases: ['cleanup', 'categories', 'tags', 'posts']
   }
 }
 
 const DEFAULT_DATASETS = {
-  brand: { options: true },
-  location: { locations: true, services: false, team: false, gallery: false },
-  blog: { categories: true, posts: false }
+  brand: { options: false },
+  location: { locations: false, services: false, team: false, gallery: false },
+  blog: { categories: false, tags: false, posts: false }
 }
 
 const SERVICE_ORDER = ['brand', 'location', 'blog']

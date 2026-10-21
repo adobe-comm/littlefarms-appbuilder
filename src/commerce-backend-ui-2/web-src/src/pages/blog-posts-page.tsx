@@ -68,7 +68,7 @@ export function BlogPostsPage({ ims, onNavigateSection }: BlogPostsPageProps) {
       try {
         const [categoryPage, tagPage] = await Promise.all([
           invokeBlogAction<{ items: BlogTaxonomyItem[] }>(ims, "blog-category-list", { listAll: true }),
-          invokeBlogAction<{ items: BlogTaxonomyItem[] }>(ims, "blog-tag-list", {}),
+          invokeBlogAction<{ items: BlogTaxonomyItem[] }>(ims, "blog-tag-list", { listAll: true }),
         ]);
         if (cancelled) return;
         setCategories(categoryPage.items || []);

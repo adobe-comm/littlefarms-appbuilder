@@ -20,6 +20,7 @@ async function main (params) {
       page: params.page,
       pageSize: params.pageSize,
       sortDir: params.sortDir,
+      listAll: params.listAll === true || params.listAll === 'true',
       filters: {
         title: params.title,
         url_key: params.url_key

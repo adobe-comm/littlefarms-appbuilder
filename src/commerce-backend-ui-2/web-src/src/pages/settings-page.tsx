@@ -111,12 +111,7 @@ export function SettingsPage({ ims }: { ims: Ims }) {
   const [migration, setMigration] = useState<MigrationSnapshot | null>(null);
   const [serviceId, setServiceId] = useState("location");
   const [mode, setMode] = useState<"update" | "write">("update");
-  const [datasets, setDatasets] = useState<Record<string, boolean>>({
-    locations: true,
-    services: false,
-    team: false,
-    gallery: false,
-  });
+  const [datasets, setDatasets] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [flushing, setFlushing] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -428,9 +423,7 @@ export function SettingsPage({ ims }: { ims: Ims }) {
                 >
                   <strong>Write</strong>
                   <span>
-                    {serviceId === "blog"
-                      ? "Remove all blog categories and posts, then import from CSV."
-                      : "Remove all location, service, team, and gallery records, then import from CSV."}
+                    For each selected dataset, remove existing rows of that type, then import from CSV.
                   </span>
                 </button>
               </div>
