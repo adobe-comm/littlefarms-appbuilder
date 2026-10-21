@@ -118,6 +118,70 @@ function mapCsvRowToServiceFields (row, mediaBase) {
   return { fields, skipped, legacyServiceId: trimmed(row.id) }
 }
 
+const GALLERY_IDS_PER_LOCATION = 1000
+
+function mapCsvRowToGalleryFields (row, mediaBase) {
+  const fields = {}
+  const skipped = []
+
+  const title = trimmed(row.title)
+  if (title) fields.title = title
+
+  const imageFile = trimmed(row.gallery)
+  if (imageFile) {
+    fields.image = legacyLocationMediaUrl(imageFile, mediaBase)
+  }
+
+  const imageAlt = trimmed(row.image_alt_text)
+  if (imageAlt) {
+    fields.imageAlt = imageAlt
+  } else if (title) {
+    fields.imageAlt = title
+  }
+
+  const statusFlag = csvBool(row.status)
+  if (statusFlag !== undefined) {
+    fields.status = statusFlag ? 'enabled' : 'disabled'
+  }
+
+  if (!title && !fields.image) {
+    skipped.push('empty_row')
+  }
+
+  return { fields, skipped }
+}
+
+/**
+ * Legacy gallery CSV uses location id in `id`; rows have no per-image id.
+ * Assign stable galleryId = locationId * 1000 + sequence (1..999 per location).
+ */
+function enrichGalleryCsvRows (galleryRows) {
+  const seqByLocation = new Map()
+  const enriched = []
+  const linksByLocation = new Map()
+
+  for (const row of galleryRows) {
+    const locationId = Number(trimmed(row.id))
+    if (!Number.isInteger(locationId) || locationId <= 0) continue
+
+    const seq = (seqByLocation.get(locationId) || 0) + 1
+    if (seq >= GALLERY_IDS_PER_LOCATION) {
+      throw new Error(
+        `Too many gallery rows for location ${locationId} (max ${GALLERY_IDS_PER_LOCATION - 1})`
+      )
+    }
+    seqByLocation.set(locationId, seq)
+
+    const galleryId = locationId * GALLERY_IDS_PER_LOCATION + seq
+    enriched.push({ row, locationId, galleryId })
+
+    if (!linksByLocation.has(locationId)) linksByLocation.set(locationId, [])
+    linksByLocation.get(locationId).push(String(galleryId))
+  }
+
+  return { enriched, linksByLocation }
+}
+
 function mapCsvRowToTeamFields (row, mediaBase) {
   const fields = {}
   const skipped = []
@@ -310,6 +374,8 @@ function stripLegacyMediaUrls (fields) {
 module.exports = {
   mapCsvRowToLocationFields,
   mapCsvRowToServiceFields,
+  mapCsvRowToGalleryFields,
+  enrichGalleryCsvRows,
   mapCsvRowToTeamFields,
   buildTeamLinksByLocationId,
   parseLegacyHours,

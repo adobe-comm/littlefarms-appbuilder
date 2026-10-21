@@ -13,12 +13,14 @@ const fs = require('fs')
 const path = require('path')
 
 const { createLocationCache } = require('../../actions/location/lib/location-cache')
-const { readCsv } = require('./lib/parse-csv')
+const { readCsv, parseCsv } = require('./lib/parse-csv')
 const { loadRuntimeParams } = require('./lib/load-params')
 const { DEFAULT_LOCATION_MEDIA_BASE } = require('./lib/legacy-media-urls')
 const {
   mapCsvRowToLocationFields,
   mapCsvRowToServiceFields,
+  mapCsvRowToGalleryFields,
+  enrichGalleryCsvRows,
   mapCsvRowToTeamFields,
   buildTeamLinksByLocationId,
   hasImportableFields,
@@ -27,15 +29,17 @@ const {
 const {
   loadLocations,
   loadServices,
+  loadGalleryItems,
   loadTeamProfiles,
   applyLocationPatches,
   insertLocations,
   upsertServices,
-  upsertTeamProfiles,
   bumpLocationCounter,
   bumpServiceCounter,
+  bumpGalleryCounter,
   bumpTeamCounter,
   buildNewLocationDocument,
+  buildGalleryDocument,
   buildServiceDocument,
   buildTeamDocument,
   locationFormDiff,
@@ -45,12 +49,14 @@ const {
 const {
   initLocationAssetUploader,
   applyLocationAssetFieldsFromCsv,
+  migrateGalleryImageFromCsv,
   migrateServiceIconFromCsv,
   migrateTeamImageFromCsv
 } = require('./lib/location-asset-migrate')
 
 const DEFAULT_LOCATION_CSV = path.join(__dirname, 'stage', 'Location_data_1.csv')
 const DEFAULT_SERVICE_CSV = path.join(__dirname, 'stage', 'Location_service_data.csv')
+const DEFAULT_GALLERY_CSV = path.join(__dirname, 'stage', 'location_gallery.csv')
 const DEFAULT_TEAM_CSV = path.join(__dirname, 'stage', 'Team_data_store_locator.csv')
 const OUT_DIR = path.join(__dirname, 'out')
 
@@ -59,6 +65,7 @@ function parseArgs (argv) {
     locationCsv: DEFAULT_LOCATION_CSV,
     serviceCsv: DEFAULT_SERVICE_CSV,
     teamCsv: DEFAULT_TEAM_CSV,
+    galleryCsv: DEFAULT_GALLERY_CSV,
     apply: false,
     limit: 0,
     preferSdk: false,
@@ -71,6 +78,12 @@ function parseArgs (argv) {
     createMissing: false,
     importServices: false,
     importTeam: false,
+    importGallery: false,
+    locationCsvText: '',
+    serviceCsvText: '',
+    teamCsvText: '',
+    galleryCsvText: '',
+    skipReportFile: false,
     help: false
   }
 
@@ -82,6 +95,7 @@ function parseArgs (argv) {
     else if (arg === '--csv-locations') options.locationCsv = argv[++i]
     else if (arg === '--csv-services') options.serviceCsv = argv[++i]
     else if (arg === '--csv-team') options.teamCsv = argv[++i]
+    else if (arg === '--csv-gallery') options.galleryCsv = argv[++i]
     else if (arg === '--limit') options.limit = Number(argv[++i]) || 0
     else if (arg === '--use-db-sdk') options.preferSdk = true
     else if (arg === '--skip-cache-flush') options.skipCacheFlush = true
@@ -93,6 +107,7 @@ function parseArgs (argv) {
     else if (arg === '--create-missing') options.createMissing = true
     else if (arg === '--import-services') options.importServices = true
     else if (arg === '--import-team') options.importTeam = true
+    else if (arg === '--import-gallery') options.importGallery = true
     else throw new Error(`Unknown argument: ${arg}`)
   }
 
@@ -106,10 +121,12 @@ Options:
   --csv-locations <path>   Location export (default: migration/data/stage/Location_data_1.csv)
   --csv-services <path>    Service export (default: migration/data/stage/Location_service_data.csv)
   --csv-team <path>        Team profile export (default: migration/data/stage/Team_data_store_locator.csv)
+  --csv-gallery <path>     Gallery image export (default: migration/data/stage/location_gallery.csv)
   --dry-run                Report only (default)
   --apply                  Write to App Builder Database
   --import-services        Upsert services from service CSV (preserves legacy numeric ids)
   --import-team            Upsert team profiles and link teamProfiles on locations (via location_ids)
+  --import-gallery         Upsert gallery items and link galleries on locations (CSV id = location_id)
   --create-missing         Insert locations not found in DB (uses legacy location_id)
   --update-all             Apply CSV mapping for every matched row (skip diff check)
   --migrate-assets         Download legacy Commerce media and upload via location-asset action
@@ -221,6 +238,101 @@ async function planServices ({
   return plan
 }
 
+async function planGalleryItems ({
+  options,
+  params,
+  enrichedRows,
+  assetUploader,
+  assetCache
+}) {
+  const { byLegacyId } = await loadGalleryItems(params, { preferSdk: options.preferSdk })
+  const plan = {
+    csvRows: enrichedRows.length,
+    dbGalleryItems: byLegacyId.size,
+    wouldUpsert: 0,
+    noChanges: 0,
+    noImportableFields: 0,
+    assetJobs: 0,
+    assetErrors: 0,
+    upserts: [],
+    samples: []
+  }
+
+  for (const { row, locationId, galleryId } of enrichedRows) {
+    const mapped = mapCsvRowToGalleryFields(row, options.mediaBase)
+    if (!hasImportableFields(mapped)) {
+      plan.noImportableFields += 1
+      continue
+    }
+
+    let galleryAssets = []
+    if (options.migrateAssets) {
+      const { assets, fieldUpdates } = await migrateGalleryImageFromCsv({
+        row,
+        galleryId: String(galleryId),
+        mediaBase: options.mediaBase,
+        dryRun: !options.apply,
+        assetUploader,
+        cache: assetCache
+      })
+      galleryAssets = assets
+      if (assets.length) {
+        plan.assetJobs += assets.length
+        plan.assetErrors += assets.filter(item => item.error).length
+      }
+      stripLegacyMediaUrls(mapped.fields)
+      Object.assign(mapped.fields, fieldUpdates)
+    }
+
+    const existing = byLegacyId.get(Number(galleryId))
+    let document
+    try {
+      document = buildGalleryDocument(String(galleryId), mapped.fields, existing)
+    } catch (error) {
+      plan.noImportableFields += 1
+      if (plan.samples.length < 5) {
+        plan.samples.push({
+          galleryId,
+          locationId,
+          error: error.message
+        })
+      }
+      continue
+    }
+
+    const hasChanges = !existing || JSON.stringify({
+      title: existing.title,
+      image: existing.image,
+      imageAlt: existing.imageAlt,
+      status: existing.status
+    }) !== JSON.stringify({
+      title: document.title,
+      image: document.image,
+      imageAlt: document.imageAlt,
+      status: document.status
+    })
+
+    if (!hasChanges && !options.updateAll) {
+      plan.noChanges += 1
+      continue
+    }
+
+    plan.wouldUpsert += 1
+    const entry = {
+      galleryId,
+      locationId,
+      title: document.title,
+      forced: options.updateAll && !hasChanges,
+      skipped: mapped.skipped,
+      assets: galleryAssets
+    }
+    plan.upserts.push({ existing, document })
+    if (plan.samples.length < 5) plan.samples.push(entry)
+  }
+
+  return plan
+}
+
 async function planTeamProfiles ({
   options,
   params,
@@ -314,7 +426,8 @@ async function planLocations ({
   assetUploader,
   assetCache,
   locationIndex,
-  teamByLocation
+  teamByLocation,
+  galleryByLocation
 }) {
   const plan = {
     csvRows: locationRows.length,
@@ -348,6 +461,13 @@ async function planLocations ({
       const linked = teamByLocation.get(Number(legacyId))
       if (linked?.length) {
         mapped.fields.teamProfiles = linked
+      }
+    }
+
+    if (galleryByLocation) {
+      const linked = galleryByLocation.get(Number(legacyId))
+      if (linked?.length) {
+        mapped.fields.galleries = linked
       }
     }
 
@@ -416,29 +536,57 @@ async function planLocations ({
   return plan
 }
 
-async function main () {
-  const options = parseArgs(process.argv)
-  if (options.help) {
-    printHelp()
-    return
+function loadCsvSource (options, { pathKey, textKey, label, required }) {
+  const text = String(options[textKey] || '').trim()
+  if (text) return parseCsv(text)
+  const filePath = options[pathKey]
+  if (filePath && fs.existsSync(filePath)) return readCsv(filePath)
+  if (required) {
+    throw new Error(`${label} CSV not found${filePath ? `: ${filePath}` : ''}.`)
   }
+  return []
+}
 
-  if (!fs.existsSync(options.locationCsv)) {
-    throw new Error(`Location CSV not found: ${options.locationCsv}`)
-  }
-  if (options.importServices && !fs.existsSync(options.serviceCsv)) {
-    throw new Error(`Service CSV not found: ${options.serviceCsv}`)
-  }
-  if (options.importTeam && !fs.existsSync(options.teamCsv)) {
-    throw new Error(`Team CSV not found: ${options.teamCsv}`)
-  }
+async function runLocationImport (params, options, hooks = {}) {
+  const onPhase = typeof hooks.onPhase === 'function' ? hooks.onPhase : () => {}
 
-  const locationRows = readCsv(options.locationCsv)
-  const serviceRows = options.importServices ? readCsv(options.serviceCsv) : []
-  const teamRows = options.importTeam ? readCsv(options.teamCsv) : []
+  const locationRows = loadCsvSource(options, {
+    pathKey: 'locationCsv',
+    textKey: 'locationCsvText',
+    label: 'Location',
+    required: true
+  })
+  const serviceRows = options.importServices
+    ? loadCsvSource(options, {
+      pathKey: 'serviceCsv',
+      textKey: 'serviceCsvText',
+      label: 'Service',
+      required: true
+    })
+    : []
+  const teamRows = options.importTeam
+    ? loadCsvSource(options, {
+      pathKey: 'teamCsv',
+      textKey: 'teamCsvText',
+      label: 'Team',
+      required: true
+    })
+    : []
+  const galleryRows = options.importGallery
+    ? loadCsvSource(options, {
+      pathKey: 'galleryCsv',
+      textKey: 'galleryCsvText',
+      label: 'Gallery',
+      required: true
+    })
+    : []
   const teamByLocation = options.importTeam ? buildTeamLinksByLocationId(teamRows) : null
+  const galleryEnriched = options.importGallery ? enrichGalleryCsvRows(galleryRows) : null
+  const galleryByLocation = galleryEnriched?.linksByLocation ?? null
 
-  const params = loadRuntimeParams({ withIms: options.preferSdk })
+  if (!params) {
+    params = loadRuntimeParams({ withIms: options.preferSdk })
+  }
   if (options.preferSdk && params.imsCredentialSource) {
     console.log(`IMS credentials: ${params.imsCredentialSource}`)
   }
@@ -476,6 +624,17 @@ async function main () {
     })
   }
 
+  let galleryPlan = null
+  if (options.importGallery && galleryEnriched) {
+    galleryPlan = await planGalleryItems({
+      options,
+      params,
+      enrichedRows: galleryEnriched.enriched,
+      assetUploader,
+      assetCache
+    })
+  }
+
   const locationPlan = await planLocations({
     options,
     params,
@@ -483,7 +642,8 @@ async function main () {
     assetUploader,
     assetCache,
     locationIndex,
-    teamByLocation
+    teamByLocation,
+    galleryByLocation
   })
 
   const report = {
@@ -495,21 +655,30 @@ async function main () {
     createMissing: options.createMissing,
     importServices: options.importServices,
     importTeam: options.importTeam,
+    importGallery: options.importGallery,
     locationCsv: options.locationCsv,
     serviceCsv: options.importServices ? options.serviceCsv : null,
     teamCsv: options.importTeam ? options.teamCsv : null,
+    galleryCsv: options.importGallery ? options.galleryCsv : null,
     teamLinksByLocation: teamByLocation
       ? Object.fromEntries([...teamByLocation.entries()].map(([key, value]) => [String(key), value]))
       : null,
+    galleryLinksByLocation: galleryByLocation
+      ? Object.fromEntries([...galleryByLocation.entries()].map(([key, value]) => [String(key), value]))
+      : null,
     services: servicePlan,
     team: teamPlan,
+    gallery: galleryPlan,
     locations: locationPlan
   }
 
-  ensureOutDir()
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const reportPath = path.join(OUT_DIR, `location-import-plan-${stamp}.json`)
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
+  let reportPath = null
+  if (!options.skipReportFile) {
+    ensureOutDir()
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    reportPath = path.join(OUT_DIR, `location-import-plan-${stamp}.json`)
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
+  }
 
   if (options.importServices && servicePlan) {
     console.log(`Services CSV: ${servicePlan.csvRows} | DB: ${servicePlan.dbServices} | Would upsert: ${servicePlan.wouldUpsert}`)
@@ -520,6 +689,12 @@ async function main () {
       console.log(`Team links: ${teamByLocation.size} location(s) with profile lists`)
     }
   }
+  if (options.importGallery && galleryPlan) {
+    console.log(`Gallery CSV: ${galleryPlan.csvRows} | DB: ${galleryPlan.dbGalleryItems} | Would upsert: ${galleryPlan.wouldUpsert}`)
+    if (galleryByLocation?.size) {
+      console.log(`Gallery links: ${galleryByLocation.size} location(s) with image lists`)
+    }
+  }
 
   console.log(`Locations CSV: ${locationPlan.csvRows} | DB: ${locationPlan.dbLocations}`)
   console.log(`Matched: ${locationPlan.matched} | Would update: ${locationPlan.wouldUpdate} | Would create: ${locationPlan.wouldCreate}`)
@@ -527,15 +702,37 @@ async function main () {
     ? 'CSV-only rows'
     : 'Unmatched (pass --create-missing to insert)'
   console.log(`No changes: ${locationPlan.noChanges} | ${unmatchedLabel}: ${locationPlan.unmatched.length}`)
-  if (locationPlan.deferredFields) {
-    console.log(`Rows with store_gallery deferred (awaiting gallery CSV): ${locationPlan.deferredFields}`)
+  if (locationPlan.deferredFields && !options.importGallery) {
+    console.log(`Rows with store_gallery on location CSV (use --import-gallery for location_gallery.csv): ${locationPlan.deferredFields}`)
   }
   if (options.migrateAssets) {
-    const jobs = (servicePlan?.assetJobs || 0) + (teamPlan?.assetJobs || 0) + locationPlan.assetJobs
-    const errors = (servicePlan?.assetErrors || 0) + (teamPlan?.assetErrors || 0) + locationPlan.assetErrors
+    const jobs = (servicePlan?.assetJobs || 0) + (teamPlan?.assetJobs || 0) +
+      (galleryPlan?.assetJobs || 0) + locationPlan.assetJobs
+    const errors = (servicePlan?.assetErrors || 0) + (teamPlan?.assetErrors || 0) +
+      (galleryPlan?.assetErrors || 0) + locationPlan.assetErrors
     console.log(`Assets: ${jobs} job(s)${errors ? `, ${errors} error(s)` : ''} (base: ${options.mediaBase})`)
   }
-  console.log(`Report: ${reportPath}`)
+  if (reportPath) console.log(`Report: ${reportPath}`)
+
+  const summary = {
+    mode: report.mode,
+    services: servicePlan
+      ? { wouldUpsert: servicePlan.wouldUpsert, csvRows: servicePlan.csvRows }
+      : null,
+    team: teamPlan
+      ? { wouldUpsert: teamPlan.wouldUpsert, csvRows: teamPlan.csvRows }
+      : null,
+    gallery: galleryPlan
+      ? { wouldUpsert: galleryPlan.wouldUpsert, csvRows: galleryPlan.csvRows }
+      : null,
+    locations: {
+      wouldUpdate: locationPlan.wouldUpdate,
+      wouldCreate: locationPlan.wouldCreate,
+      csvRows: locationPlan.csvRows,
+      unmatched: locationPlan.unmatched.length
+    },
+    reportPath
+  }
 
   if (!options.apply) {
     console.log('\nDry run only. Re-run with --apply to write changes.')
@@ -548,7 +745,10 @@ async function main () {
     if (!options.importTeam) {
       console.log('Tip: use --import-team to migrate Team_data_store_locator.csv and link profiles.')
     }
-    return
+    if (!options.importGallery) {
+      console.log('Tip: use --import-gallery to migrate location_gallery.csv and link galleries on locations.')
+    }
+    return summary
   }
 
   const progressOptions = {
@@ -556,6 +756,11 @@ async function main () {
     progressEvery: options.progressEvery,
     verbose: options.verbose,
     onProgress: ({ done, total, item }) => {
+      onPhase('apply', {
+        done,
+        total,
+        label: item?.document?.title || item?.document?.name || item?.base?.title || 'Writing rows'
+      })
       if (options.verbose && item?.document?.title) {
         console.log(`  ${done}/${total} — ${item.document.title}`)
         return
@@ -573,6 +778,7 @@ async function main () {
   }
 
   if (options.importServices && servicePlan?.wouldUpsert) {
+    onPhase('services', { done: 0, total: servicePlan.wouldUpsert, label: 'Services' })
     let serviceUpserts = servicePlan.upserts
     if (options.limit > 0) serviceUpserts = serviceUpserts.slice(0, options.limit)
     console.log(`\nApplying ${serviceUpserts.length} service upsert(s)...`)
@@ -587,15 +793,31 @@ async function main () {
   }
 
   if (options.importTeam && teamPlan?.wouldUpsert) {
+    onPhase('team', { done: 0, total: teamPlan.wouldUpsert, label: 'Team profiles' })
     let teamUpserts = teamPlan.upserts
     if (options.limit > 0) teamUpserts = teamUpserts.slice(0, options.limit)
     console.log(`\nApplying ${teamUpserts.length} team profile upsert(s)...`)
-    await upsertTeamProfiles(params, teamUpserts, progressOptions)
+    await upsertServices(params, teamUpserts, progressOptions)
     const maxProfileId = Math.max(
       ...teamUpserts.map(item => Number(item.document.profileId)).filter(Number.isFinite),
       1
     )
     await bumpTeamCounter(params, maxProfileId + 1, {
+      preferSdk: options.preferSdk
+    })
+  }
+
+  if (options.importGallery && galleryPlan?.wouldUpsert) {
+    onPhase('gallery', { done: 0, total: galleryPlan.wouldUpsert, label: 'Gallery' })
+    let galleryUpserts = galleryPlan.upserts
+    if (options.limit > 0) galleryUpserts = galleryUpserts.slice(0, options.limit)
+    console.log(`\nApplying ${galleryUpserts.length} gallery item upsert(s)...`)
+    await upsertServices(params, galleryUpserts, progressOptions)
+    const maxGalleryId = Math.max(
+      ...galleryUpserts.map(item => Number(item.document.galleryId)).filter(Number.isFinite),
+      1
+    )
+    await bumpGalleryCounter(params, maxGalleryId + 1, {
       preferSdk: options.preferSdk
     })
   }
@@ -606,6 +828,14 @@ async function main () {
     updates = updates.slice(0, options.limit)
     const remaining = Math.max(0, options.limit - updates.length)
     creates = creates.slice(0, remaining)
+  }
+
+  if (updates.length || creates.length) {
+    onPhase('locations', {
+      done: 0,
+      total: updates.length + creates.length,
+      label: 'Locations'
+    })
   }
 
   if (updates.length) {
@@ -639,9 +869,32 @@ async function main () {
   }
 
   console.log('\nLocation import apply finished.')
+  summary.applied = {
+    services: options.importServices ? servicePlan?.wouldUpsert || 0 : 0,
+    team: options.importTeam ? teamPlan?.wouldUpsert || 0 : 0,
+    gallery: options.importGallery ? galleryPlan?.wouldUpsert || 0 : 0,
+    locationUpdates: updates.length,
+    locationCreates: creates.length
+  }
+  return summary
 }
 
-main().catch(error => {
-  console.error(error.message || error)
-  process.exit(1)
-})
+async function main () {
+  const options = parseArgs(process.argv)
+  if (options.help) {
+    printHelp()
+    return
+  }
+  await runLocationImport(undefined, options)
+}
+
+if (require.main === module) {
+  main().catch(error => {
+    console.error(error.message || error)
+    process.exit(1)
+  })
+}
+
+module.exports = {
+  runLocationImport
+}

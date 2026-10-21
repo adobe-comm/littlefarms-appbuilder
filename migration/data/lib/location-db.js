@@ -9,6 +9,7 @@ const {
 const {
   openContentDb,
   normalizeServiceFields,
+  normalizeGalleryFields,
   normalizeTeamFields
 } = require('../../../actions/location/lib/content-store')
 const {
@@ -59,6 +60,15 @@ function indexTeamProfiles (docs) {
   for (const doc of docs) {
     if (doc.type !== 'team') continue
     byLegacyId.set(Number(doc.profileId), doc)
+  }
+  return byLegacyId
+}
+
+function indexGalleryItems (docs) {
+  const byLegacyId = new Map()
+  for (const doc of docs) {
+    if (doc.type !== 'gallery') continue
+    byLegacyId.set(Number(doc.galleryId), doc)
   }
   return byLegacyId
 }
@@ -139,6 +149,28 @@ async function loadTeamProfiles (params, { preferSdk = false } = {}) {
   return { docs, byLegacyId: indexTeamProfiles(docs) }
 }
 
+async function loadGalleryItemsViaSdk (params) {
+  const opened = await openContentDb(params)
+  try {
+    const docs = await opened.collection.find({ type: 'gallery' }).toArray()
+    return { docs, byLegacyId: indexGalleryItems(docs) }
+  } finally {
+    await opened.client.close()
+  }
+}
+
+async function loadGalleryItems (params, { preferSdk = false } = {}) {
+  if (preferSdk) {
+    try {
+      return await loadGalleryItemsViaSdk(params)
+    } catch (error) {
+      console.warn(`SDK gallery read failed (${error.message}). Falling back to aio CLI.`)
+    }
+  }
+  const docs = loadDocumentsViaCli(LOCATION_CONTENT_COLLECTION, { type: 'gallery' })
+  return { docs, byLegacyId: indexGalleryItems(docs) }
+}
+
 function mergeLocationPatch (base, rawFields) {
   const patch = sanitizeLocation(rawFields)
   const next = { ...base, ...patch, updatedAt: new Date().toISOString() }
@@ -204,10 +236,40 @@ function contentUpsertSet (existing, document) {
     }
     return set
   }
+  if (document.type === 'gallery') {
+    for (const key of ['title', 'image', 'imageAlt', 'status']) {
+      if (document[key] !== undefined) set[key] = document[key]
+    }
+    return set
+  }
   for (const key of ['title', 'serviceUrl', 'icon', 'status']) {
     if (document[key] !== undefined) set[key] = document[key]
   }
   return set
+}
+
+function buildGalleryDocument (legacyGalleryId, rawFields, existing) {
+  const galleryId = Number(legacyGalleryId)
+  if (!Number.isInteger(galleryId) || galleryId <= 0) {
+    throw new Error(`Invalid legacy gallery id: ${legacyGalleryId}`)
+  }
+  const now = new Date().toISOString()
+  const record = normalizeGalleryFields(rawFields)
+  if (existing) {
+    return {
+      ...existing,
+      ...record,
+      updatedAt: now
+    }
+  }
+  return {
+    id: `gallery:${galleryId}`,
+    type: 'gallery',
+    galleryId,
+    ...record,
+    createdAt: now,
+    updatedAt: now
+  }
 }
 
 function buildServiceDocument (legacyServiceId, rawFields, existing) {
@@ -383,10 +445,6 @@ async function upsertServices (params, upserts, options = {}) {
   return upsertServicesViaCli(upserts, options)
 }
 
-async function upsertTeamProfiles (params, upserts, options = {}) {
-  return upsertServices(params, upserts, options)
-}
-
 async function bumpLocationCounter (params, minimumNextId, { preferSdk = false } = {}) {
   const nextId = Math.max(1, Number(minimumNextId) || 1)
 
@@ -462,6 +520,48 @@ async function bumpServiceCounter (params, minimumNextId, { preferSdk = false } 
   }
 }
 
+async function bumpGalleryCounter (params, minimumNextId, { preferSdk = false } = {}) {
+  const nextId = Math.max(1, Number(minimumNextId) || 1)
+
+  if (preferSdk) {
+    const opened = await openContentDb(params)
+    try {
+      let counter = await opened.collection.findOne({ id: CONTENT_COUNTER_ID })
+      if (!counter) {
+        counter = {
+          id: CONTENT_COUNTER_ID,
+          type: 'counter',
+          nextServiceId: 1,
+          nextGalleryId: 1,
+          nextTeamId: 1
+        }
+      }
+      counter.nextGalleryId = Math.max(Number(counter.nextGalleryId) || 1, nextId)
+      const hadCounter = await opened.collection.findOne({ id: CONTENT_COUNTER_ID })
+      if (hadCounter) await opened.collection.replaceOne({ id: CONTENT_COUNTER_ID }, counter)
+      else await opened.collection.insertOne(counter)
+      return
+    } finally {
+      await opened.client.close()
+    }
+  }
+
+  const filter = { id: CONTENT_COUNTER_ID }
+  const existing = loadDocumentsViaCli(LOCATION_CONTENT_COLLECTION, filter)[0]
+  const nextGalleryId = Math.max(Number(existing?.nextGalleryId) || 1, nextId)
+  if (existing) {
+    aioUpdateDocument(LOCATION_CONTENT_COLLECTION, filter, { nextGalleryId })
+  } else {
+    aioInsertDocuments(LOCATION_CONTENT_COLLECTION, {
+      id: CONTENT_COUNTER_ID,
+      type: 'counter',
+      nextGalleryId,
+      nextTeamId: 1,
+      nextServiceId: 1
+    })
+  }
+}
+
 async function bumpTeamCounter (params, minimumNextId, { preferSdk = false } = {}) {
   const nextId = Math.max(1, Number(minimumNextId) || 1)
 
@@ -519,15 +619,17 @@ function locationFormDiff (baseDoc, rawFields) {
 module.exports = {
   loadLocations,
   loadServices,
+  loadGalleryItems,
   loadTeamProfiles,
   applyLocationPatches,
   insertLocations,
   upsertServices,
-  upsertTeamProfiles,
   bumpLocationCounter,
   bumpServiceCounter,
+  bumpGalleryCounter,
   bumpTeamCounter,
   buildNewLocationDocument,
+  buildGalleryDocument,
   buildServiceDocument,
   buildTeamDocument,
   locationFormDiff,

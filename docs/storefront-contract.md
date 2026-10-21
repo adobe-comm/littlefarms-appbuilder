@@ -290,7 +290,7 @@ GraphQL **`littleFarmsLocations`** calls this operation and returns the `items` 
 {"operation":"get","locationId":1}
 ```
 
-Response shape matches the Admin location form (`location` object with hours, map fields, rich content, and image URLs).
+Response shape matches the Admin location form (`location` object with hours, map fields, rich content, and image URLs). For **`operation: get`** only, linked **services**, **galleries**, and **teamProfiles** are expanded from `littlefarms_location_content` (enabled rows only, order matches the id lists on the location document). **`operation: directory`** and **`list`** still omit linked content.
 
 ### Blog (posts & categories)
 

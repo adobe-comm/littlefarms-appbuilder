@@ -132,6 +132,9 @@ query {
     longitude
     storeContent
     storeHours { monday { open from to } }
+    teamProfiles { profileId name jobTitle image sortOrder }
+    galleries { galleryId title image imageAlt }
+    services { serviceId title serviceUrl icon }
   }
 }
 ```

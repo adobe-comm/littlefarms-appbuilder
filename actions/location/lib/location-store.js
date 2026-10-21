@@ -1,5 +1,11 @@
 const { Core } = require('@adobe/aio-sdk')
 const libDb = require('@adobe/aio-lib-db')
+const {
+  openContentDb,
+  toStorefrontService,
+  toStorefrontGallery,
+  toStorefrontTeam
+} = require('./content-store')
 
 const LOCATIONS_COLLECTION = 'littlefarms_locations'
 const READ_BATCH = 100
@@ -336,6 +342,79 @@ function toForm (doc) {
   }
 }
 
+function parseOrderedLinkIds (values) {
+  const ids = []
+  const seen = new Set()
+  for (const raw of values || []) {
+    const id = Number(text(raw))
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue
+    seen.add(id)
+    ids.push(id)
+  }
+  return ids
+}
+
+function indexContentByField (docs, field) {
+  const map = new Map()
+  for (const doc of docs) {
+    const id = Number(doc[field])
+    if (Number.isInteger(id) && id > 0) map.set(id, doc)
+  }
+  return map
+}
+
+function linkedContentInOrder (orderedIds, byId, mapFn) {
+  const items = []
+  for (const id of orderedIds) {
+    const doc = byId.get(id)
+    const mapped = doc ? mapFn(doc) : null
+    if (mapped) items.push(mapped)
+  }
+  return items
+}
+
+function contentAggregateMatch (serviceIds, galleryIds, teamIds) {
+  const clauses = []
+  if (serviceIds.length) {
+    clauses.push({ type: 'service', serviceId: { $in: serviceIds }, status: { $ne: 'disabled' } })
+  }
+  if (galleryIds.length) {
+    clauses.push({ type: 'gallery', galleryId: { $in: galleryIds }, status: { $ne: 'disabled' } })
+  }
+  if (teamIds.length) {
+    clauses.push({ type: 'team', profileId: { $in: teamIds }, status: { $ne: 'disabled' } })
+  }
+  return clauses.length ? [{ $match: { $or: clauses } }] : []
+}
+
+/** One aggregation on location content; preserves link order from the location form. */
+async function attachLinkedStorefrontContent (params, locationForm) {
+  const serviceIds = parseOrderedLinkIds(locationForm.services)
+  const galleryIds = parseOrderedLinkIds(locationForm.galleries)
+  const teamIds = parseOrderedLinkIds(locationForm.teamProfiles)
+  const pipeline = contentAggregateMatch(serviceIds, galleryIds, teamIds)
+
+  if (!pipeline.length) {
+    return { ...locationForm, services: [], galleries: [], teamProfiles: [] }
+  }
+
+  const opened = await openContentDb(params)
+  try {
+    const docs = await opened.collection.aggregate(pipeline).toArray()
+    const services = docs.filter(doc => doc.type === 'service')
+    const galleries = docs.filter(doc => doc.type === 'gallery')
+    const teams = docs.filter(doc => doc.type === 'team')
+    return {
+      ...locationForm,
+      services: linkedContentInOrder(serviceIds, indexContentByField(services, 'serviceId'), toStorefrontService),
+      galleries: linkedContentInOrder(galleryIds, indexContentByField(galleries, 'galleryId'), toStorefrontGallery),
+      teamProfiles: linkedContentInOrder(teamIds, indexContentByField(teams, 'profileId'), toStorefrontTeam)
+    }
+  } finally {
+    await opened.client.close()
+  }
+}
+
 async function findOneOrNull (collection, filter) {
   try {
     return await collection.findOne(filter)
@@ -407,25 +486,30 @@ function createLocationStore (params, opener = openLocationDb) {
     },
 
     async getStorefront ({ locationId, title, storeUrl }) {
+      let form = null
       const idRaw = text(locationId)
       if (idRaw) {
         const id = Number(idRaw)
         if (!Number.isInteger(id) || id <= 0) throw httpError(400, 'Location id is not valid.')
-        return withDb(async ({ locations }) => {
+        form = await withDb(async ({ locations }) => {
           const doc = await findOneOrNull(locations, { type: 'location', locationId: id })
           return doc && isEnabledLocation(doc) ? toForm(doc) : null
         })
+      } else {
+        const titleNeedle = text(title).toLowerCase()
+        const urlNeedle = text(storeUrl)
+        if (titleNeedle || urlNeedle) {
+          const docs = await loadAll()
+          const matched = docs.filter(doc => {
+            if (!isEnabledLocation(doc)) return false
+            if (titleNeedle) return text(doc.title).toLowerCase() === titleNeedle
+            return text(doc.storeUrl) === urlNeedle
+          })
+          form = matched.length ? toForm(matched[0]) : null
+        }
       }
-      const titleNeedle = text(title).toLowerCase()
-      const urlNeedle = text(storeUrl)
-      if (!titleNeedle && !urlNeedle) return null
-      const docs = await loadAll()
-      const matched = docs.filter(doc => {
-        if (!isEnabledLocation(doc)) return false
-        if (titleNeedle) return text(doc.title).toLowerCase() === titleNeedle
-        return text(doc.storeUrl) === urlNeedle
-      })
-      return matched.length ? toForm(matched[0]) : null
+      if (!form) return null
+      return attachLinkedStorefrontContent(params, form)
     },
 
     async listStorefront ({ page, pageSize, filters = {} }) {

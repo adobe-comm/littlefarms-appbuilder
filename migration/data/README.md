@@ -11,8 +11,9 @@ Legacy Aheadworks Store Locator exports live under `stage/`. The importer maps r
 | `stage/Location_data_1.csv` | Store / cafe locations |
 | `stage/Location_service_data.csv` | Linked services (Butcher, Wine, …) |
 | `stage/Team_data_store_locator.csv` | Team profiles linked to locations |
+| `stage/location_gallery.csv` | Gallery images linked to locations |
 
-Gallery CSV is **not** wired yet (`store_gallery` is reported as deferred in the import plan).
+The location CSV column `store_gallery` is not parsed directly; use `--import-gallery` with `location_gallery.csv` instead.
 
 ### Join / identity
 
@@ -20,6 +21,7 @@ Gallery CSV is **not** wired yet (`store_gallery` is reported as deferred in the
 - **Create:** `--create-missing` inserts CSV-only rows using legacy `location_id` as `locationId`.
 - **Services:** `--import-services` upserts by legacy numeric `id` → `serviceId`.
 - **Team:** `--import-team` upserts profiles by legacy `id` → `profileId`; links `teamProfiles` on each location from the team CSV `location_ids` column (and from `store_team` on the location CSV when present).
+- **Gallery:** `--import-gallery` upserts items from `location_gallery.csv` where CSV `id` is the legacy **location_id**. Each row becomes one gallery document; stable `galleryId` = `locationId × 1000 + row sequence` (1…999 per location). Location `galleries` is set to the ordered list of those ids.
 
 ### Field mapping (locations)
 
@@ -42,13 +44,13 @@ Relative media paths are expanded with `--media-base` (default below) so documen
 
 ```bash
 # Plan only
-node migration/data/import-locations.js --import-services --import-team --create-missing
+node migration/data/import-locations.js --import-services --import-team --import-gallery --create-missing
 
-# Services + team, then update existing locations
-node migration/data/import-locations.js --apply --import-services --import-team
+# Services + team + gallery, then update existing locations
+node migration/data/import-locations.js --apply --import-services --import-team --import-gallery
 
-# Full greenfield: services + team + insert all CSV locations
-node migration/data/import-locations.js --apply --import-services --import-team --create-missing
+# Full greenfield: services + team + gallery + insert all CSV locations
+node migration/data/import-locations.js --apply --import-services --import-team --import-gallery --create-missing
 
 # Include legacy image download + location-asset runtime upload
 node migration/data/import-locations.js --apply --import-services --create-missing --migrate-assets
@@ -63,6 +65,48 @@ Optional flags mirror the brand importer: `--media-base`, `--use-db-sdk`, `--upd
 Reports: `migration/data/out/location-import-plan-<timestamp>.json`.
 
 App Builder document storage is **not** partitioned by Commerce `environmentId` (that field is not used on saved rows). `MAGENTO_ENVIRONMENT_ID` in `.env` is only for **Commerce GraphQL API headers**.
+
+---
+
+# Blog migration (CSV → App Builder)
+
+Legacy Aheadworks Blog exports under `stage/`. The importer maps into `littlefarms_blog_categories` and `littlefarms_blog_posts` (same shapes as the Blog admin module).
+
+## Source files
+
+| File | Description |
+|------|-------------|
+| `stage/Blog_category.csv` | Categories (Recipes, Guides, Stories, …) |
+| `stage/Blog.csv` | Posts |
+| *(future)* tag export | Tags — **`tag_names` on posts are not imported yet** |
+
+## Join / identity
+
+- **Categories:** legacy CSV `id` → `taxonomyId` (upsert by legacy id).
+- **Posts:** legacy CSV `id` → `postId`. **`category_names`** (comma-separated titles) resolve to `category_ids` using the category CSV and/or categories already in DB — run **`--import-categories` before `--import-posts`** (or in the same apply pass with categories first).
+- **Tags:** deferred until a tag CSV importer is added; posts import with `tag_ids: []` and the plan reports rows that had `tag_names`.
+
+## Field notes
+
+| CSV | App Builder |
+|-----|-------------|
+| `name` / `title` | category `title` / post `title` |
+| `url_key` | same |
+| Category `status` `1`/`0` | `is_active` |
+| Post `status` `publication` | `published` (other values → `draft`) |
+| `publish_date`, `end_date` | `publish_at`, `end_at` (ISO) |
+| `post_view` | `view_count` |
+| Image URL/file columns | Prefer `*_image_url` when HTTPS; else `{mediaBase}/{path}` (default base `https://mcstaging.littlefarms.com/media`). Example: CSV `wysiwyg/Kialla_Pure_Foods/Fresh_Peach_Waffles.jpg` → `https://mcstaging.littlefarms.com/media/wysiwyg/Kialla_Pure_Foods/Fresh_Peach_Waffles.jpg`. Leading `.renditions/` on paths is stripped before join. |
+| `customer_groups` `all` | empty `customer_group_ids` (visible to all groups) |
+
+## Run
+
+```bash
+node migration/data/import-blog.js --import-categories --import-posts
+node migration/data/import-blog.js --apply --import-categories --import-posts
+```
+
+Reports: `migration/data/out/blog-import-plan-<timestamp>.json`. Optional: `--csv-categories`, `--csv-posts`, `--media-base`, `--use-db-sdk`, `--update-all`, `--limit`, `--verbose`.
 
 ---
 

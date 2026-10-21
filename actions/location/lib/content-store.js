@@ -150,6 +150,35 @@ function toTeamForm (doc) {
   }
 }
 
+function toStorefrontService (doc) {
+  return {
+    serviceId: Number(doc.serviceId),
+    title: text(doc.title),
+    serviceUrl: text(doc.serviceUrl),
+    icon: text(doc.icon)
+  }
+}
+
+function toStorefrontGallery (doc) {
+  return {
+    galleryId: Number(doc.galleryId),
+    title: text(doc.title),
+    image: text(doc.image),
+    imageAlt: text(doc.imageAlt)
+  }
+}
+
+function toStorefrontTeam (doc) {
+  const sortOrder = Number(doc.sortOrder)
+  return {
+    profileId: Number(doc.profileId),
+    name: text(doc.name),
+    jobTitle: text(doc.jobTitle),
+    image: text(doc.image),
+    sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0
+  }
+}
+
 function toForm (doc, kindMeta) {
   if (kindMeta.type === 'service') return toServiceForm(doc)
   if (kindMeta.type === 'gallery') return toGalleryForm(doc)
@@ -397,5 +426,9 @@ module.exports = {
   CONTENT_KINDS: Object.keys(KINDS),
   openContentDb,
   normalizeServiceFields,
-  normalizeTeamFields
+  normalizeGalleryFields,
+  normalizeTeamFields,
+  toStorefrontService,
+  toStorefrontGallery,
+  toStorefrontTeam
 }
