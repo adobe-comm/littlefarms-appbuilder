@@ -1,3 +1,5 @@
+@import "./paas-admin-theme.css";
+
 body {
   margin: 0;
   color: #292929;
@@ -270,13 +272,25 @@ html.lf-embed .block-edit-page .lf-section-layout-body {
 }
 
 .block-edit-actions button {
+  box-sizing: border-box;
+  margin: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Commerce page-actions: secondary = plain text links (no box border) */
+.block-edit-actions button:not(.admin-primary) {
   border: none;
   background: transparent;
   color: #303030;
   padding: 8px 0;
   font-size: 14px;
   font-weight: 600;
-  cursor: pointer;
+  line-height: 1.36;
+}
+
+.block-edit-actions button:not(.admin-primary):hover:not(:disabled) {
+  color: #007bdb;
 }
 
 .block-edit-actions button:disabled {
@@ -289,8 +303,16 @@ html.lf-embed .block-edit-page .lf-section-layout-body {
   background: #eb5202;
   color: #fff;
   padding: 11px 18px;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.36;
+  border-radius: 1px;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.block-edit-actions .admin-primary:hover:not(:disabled) {
+  background: #ba4000;
+  border-color: #ba4000;
 }
 
 .block-edit-page {
@@ -1835,9 +1857,8 @@ form.brand-inline {
 
 .admin-list.conditional-blocks {
   padding: 0 0 32px;
-  background: #fff;
-  color: #303030;
-  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: var(--paas-color-white, #fff);
+  color: inherit;
 }
 
 .admin-list-header {
@@ -1852,10 +1873,6 @@ form.brand-inline {
 
 .admin-list-header h1 {
   margin: 0;
-  font-size: 26px;
-  font-weight: 400;
-  line-height: 1.1;
-  color: #303030;
 }
 
 .admin-primary {
@@ -2348,14 +2365,15 @@ form.brand-inline {
   padding: 28px 10px;
 }
 
+/* Commerce .data-grid th (1px ≈ .1rem @ admin html 62.5%) */
 .admin-grid thead th {
-  background: #000;
+  background-color: #000;
+  border: 1px solid #666;
   color: #fff;
-  border-color: #000;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  letter-spacing: normal;
+  text-transform: none;
   white-space: nowrap;
 }
 
@@ -2364,7 +2382,7 @@ form.brand-inline {
 }
 
 .admin-grid tbody tr:hover td {
-  background: #e5f7fe;
+  background: #f8f8f8;
 }
 
 .admin-grid .admin-row-link {

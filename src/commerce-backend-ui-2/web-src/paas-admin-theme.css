@@ -1,0 +1,398 @@
+/**
+ * Adobe Commerce PaaS admin design tokens (rem values → px at html 62.5% / 1rem = 10px).
+ * Scoped to .lf-app-main so App Builder UI matches native admin inside the embed.
+ */
+.lf-app-main {
+  /* Typography */
+  --paas-font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --paas-font-size-body: 14px;
+  --paas-font-size-h1: 24px;
+  --paas-font-size-h2: 20px;
+  --paas-font-size-h3: 16px;
+  --paas-font-size-h4: 14px;
+  --paas-font-size-label: 14px;
+  --paas-font-size-input: 14px;
+  --paas-font-size-button: 16px;
+  --paas-font-size-small: 12px;
+  --paas-font-size-table: 14px;
+  --paas-font-size-table-heading: 14px;
+  --paas-font-weight-table-heading: 700;
+  /* Magento .data-grid th */
+  --paas-color-table-heading: #fff;
+  --paas-bg-table-heading: #000;
+  --paas-border-table-heading: #666;
+  --paas-font-size-error: 12px;
+  --paas-font-weight-body: 400;
+  --paas-font-weight-heading: 600;
+  --paas-font-weight-h1: 400;
+  --paas-font-weight-label: 600;
+  --paas-font-weight-button: 600;
+  --paas-line-height-body: 1.36;
+
+  /* Text */
+  --paas-color-body: #222;
+  --paas-color-heading: #41362f;
+  --paas-color-dark: #303030;
+  --paas-color-secondary: #514943;
+  --paas-color-muted: #666;
+  --paas-color-muted-light: #858585;
+  --paas-color-gray: #999;
+
+  /* Links & blues */
+  --paas-color-link: #007bdb;
+  --paas-color-link-hover: #007bdb;
+  --paas-color-primary-blue: #007bdb;
+  --paas-color-secondary-blue: #008bdb;
+  --paas-color-dark-blue: #006bb4;
+  --paas-color-light-blue: #1e79c2;
+  --paas-color-active-blue: #007bdb;
+  --paas-color-focus-outline: #008bdb;
+  --paas-color-focus-border: #007bdb;
+
+  /* Orange */
+  --paas-color-primary-orange: #eb5202;
+  --paas-color-orange: #ff5216;
+  --paas-color-dark-orange: #ba4000;
+
+  /* Green */
+  --paas-color-success: #79a22e;
+  --paas-color-success-bright: #81c21d;
+  --paas-color-success-dark: #006400;
+  --paas-color-success-light-bg: #e7f5ee;
+  --paas-color-success-ui: #52b430;
+
+  /* Red */
+  --paas-color-error: #e22626;
+  --paas-color-error-dark: #8b0000;
+  --paas-color-error-bright: #ff0000;
+  --paas-color-danger-light-bg: #fceaea;
+  --paas-color-danger-light-bg-alt: #fce7e7;
+
+  /* Yellow / warning */
+  --paas-color-warning: #ff0;
+  --paas-color-warning-light: #fffbbb;
+  --paas-color-warning-panel: #fcf7ea;
+  --paas-color-warning-accent: #ffe49f;
+
+  /* Backgrounds */
+  --paas-bg-page: #fff;
+  --paas-bg-body: #fff;
+  --paas-bg-input: #fff;
+  --paas-bg-button: #fff;
+  --paas-bg-table: #efefef;
+  --paas-bg-disabled: #e9e9e9;
+  --paas-bg-collapsible: #f8f8f8;
+  --paas-bg-tooltip: #fffbbb;
+  --paas-bg-error: #fffbbb;
+  --paas-bg-dropdown: #fff;
+  --paas-bg-active: #fff;
+  --paas-bg-hover: #f8f8f8;
+  --paas-bg-row-drag: #d0d0d0;
+  --paas-bg-overlay: rgba(0, 0, 0, 0.35);
+
+  /* Neutrals (aliases) */
+  --paas-color-white: #fff;
+  --paas-color-black: #000;
+  --paas-bg-light: var(--paas-bg-collapsible);
+  --paas-bg-gray: var(--paas-bg-table);
+  --paas-border-medium: #d0d0d0;
+  --paas-border: #adadad;
+  --paas-border-hover: #878787;
+  --paas-border-light: #ccc;
+
+  /* Inputs */
+  --paas-input-bg: var(--paas-bg-input);
+  --paas-input-color: #303030;
+  --paas-input-border: #adadad;
+  --paas-input-border-hover: #878787;
+  --paas-input-border-focus: #007bdb;
+  --paas-disabled-color: #303030;
+  --paas-disabled-bg: #e9e9e9;
+  --paas-disabled-border: #adadad;
+
+  /* Checkbox / radio */
+  --paas-checkbox-bg: #fff;
+  --paas-checkbox-border: #adadad;
+  --paas-checkbox-checked: #514943;
+
+  /* Tables */
+  --paas-table-bg: var(--paas-bg-table);
+  --paas-table-border: #fff;
+  --paas-table-drag: var(--paas-bg-row-drag);
+
+  /* Panels */
+  --paas-collapsible-bg: var(--paas-bg-collapsible);
+  --paas-collapsible-border: #ccc;
+  --paas-info-bg: #e7f4f9;
+  --paas-info-light: #e0f6fe;
+
+  /* Tooltip / error box */
+  --paas-tooltip-bg: var(--paas-bg-tooltip);
+  --paas-tooltip-border: #afadac;
+  --paas-error-bg: var(--paas-bg-error);
+  --paas-error-border: #ee7d7d;
+  --paas-error-text: #555;
+  --paas-error-field-border: #e22626;
+
+  /* Dropdown */
+  --paas-dropdown-bg: var(--paas-bg-dropdown);
+  --paas-dropdown-border: #007bdb;
+  --paas-dropdown-shadow: rgba(0, 0, 0, 0.5);
+
+  /* Overlay */
+  --paas-overlay: var(--paas-bg-overlay);
+  --paas-loading-overlay: rgba(255, 255, 255, 0.2);
+  --paas-loading-mask: rgba(255, 255, 255, 0.5);
+
+  /* Address (locations) */
+  --paas-address-bg: #f1f1f1;
+  --paas-address-border: #dad1c8;
+  --paas-address-active-bg: var(--paas-bg-active);
+  --paas-address-active-shadow: #d9d2ca;
+
+  font-family: var(--paas-font-family);
+  font-size: var(--paas-font-size-body);
+  font-weight: var(--paas-font-weight-body);
+  line-height: var(--paas-line-height-body);
+  color: var(--paas-color-body);
+  background: var(--paas-bg-page);
+}
+
+.lf-app-main .conditional-blocks,
+.lf-app-main .admin-list,
+.lf-app-main .lf-blog-module,
+.lf-app-main .lf-location-module,
+.lf-app-main .block-edit-page {
+  background: var(--paas-bg-body);
+}
+
+.lf-app-main button,
+.lf-app-main input,
+.lf-app-main select,
+.lf-app-main textarea {
+  font-family: inherit;
+}
+
+/* Headings */
+.lf-app-main h1,
+.lf-app-main .admin-list-header h1,
+.lf-app-main .admin-post-edit-header h1,
+.lf-app-main .location-edit-page .lf-section-layout-header h1,
+.lf-app-main main.conditional-blocks > h1 {
+  color: var(--paas-color-heading);
+  font-size: var(--paas-font-size-h1);
+  font-weight: var(--paas-font-weight-h1);
+  line-height: 1.4;
+  margin: 0;
+  padding-top: 5px;
+  word-break: break-all;
+}
+
+.lf-app-main h2 {
+  color: var(--paas-color-heading);
+  font-size: var(--paas-font-size-h2);
+  font-weight: var(--paas-font-weight-heading);
+  line-height: 1.4;
+}
+
+.lf-app-main h3 {
+  color: var(--paas-color-heading);
+  font-size: var(--paas-font-size-h3);
+  font-weight: var(--paas-font-weight-heading);
+  line-height: 1.4;
+}
+
+.lf-app-main h4 {
+  color: var(--paas-color-heading);
+  font-size: var(--paas-font-size-h4);
+  font-weight: var(--paas-font-weight-heading);
+  line-height: 1.4;
+}
+
+.lf-app-main a,
+.lf-app-main .admin-inline-link {
+  color: var(--paas-color-link);
+}
+
+.lf-app-main a:hover,
+.lf-app-main .admin-inline-link:hover {
+  color: var(--paas-color-link-hover);
+}
+
+.lf-app-main label,
+.lf-app-main .field-row > label {
+  font-size: var(--paas-font-size-label);
+  font-weight: var(--paas-font-weight-label);
+  color: var(--paas-color-dark);
+}
+
+/* Grid form labels (.admin__field-label) use 400 in native admin */
+.lf-app-main .block-edit-page .field-row > label {
+  font-weight: 400;
+  color: var(--paas-color-dark);
+}
+
+.lf-app-main input:not([type="checkbox"]):not([type="radio"]),
+.lf-app-main select,
+.lf-app-main textarea {
+  font-size: var(--paas-font-size-input);
+  font-weight: var(--paas-font-weight-body);
+  color: var(--paas-input-color);
+  background: var(--paas-input-bg);
+  border-color: var(--paas-input-border);
+}
+
+.lf-app-main input:not([type="checkbox"]):not([type="radio"]):hover,
+.lf-app-main select:hover,
+.lf-app-main textarea:hover {
+  border-color: var(--paas-input-border-hover);
+}
+
+.lf-app-main input:not([type="checkbox"]):not([type="radio"]):focus,
+.lf-app-main select:focus,
+.lf-app-main textarea:focus {
+  border-color: var(--paas-input-border-focus);
+  outline-color: var(--paas-color-focus-outline);
+}
+
+.lf-app-main input:disabled,
+.lf-app-main select:disabled,
+.lf-app-main textarea:disabled {
+  color: var(--paas-disabled-color);
+  background: var(--paas-disabled-bg);
+  border-color: var(--paas-disabled-border);
+}
+
+.lf-app-main .block-edit-actions button:not(.admin-primary) {
+  border: none;
+  background: transparent;
+  color: var(--paas-color-dark);
+  padding: 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.lf-app-main .block-edit-actions button:not(.admin-primary):hover:not(:disabled) {
+  color: var(--paas-color-link);
+}
+
+.lf-app-main .admin-ui-multiselect-toolbar button,
+.lf-app-main .admin-ui-multiselect-footer button {
+  background: var(--paas-bg-button);
+  border: 1px solid var(--paas-border);
+  color: var(--paas-color-dark);
+  font-size: var(--paas-font-size-small);
+  font-weight: 400;
+  padding: 5px 14px;
+}
+
+.lf-app-main .admin-primary,
+.lf-app-main .block-edit-actions .admin-primary {
+  background: var(--paas-color-primary-orange);
+  border-color: var(--paas-color-primary-orange);
+  color: var(--paas-color-white);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 18px;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.lf-app-main .block-edit-actions .admin-primary:hover:not(:disabled) {
+  background: var(--paas-color-dark-orange);
+  border-color: var(--paas-color-dark-orange);
+}
+
+.lf-app-main .field-hint,
+.lf-app-main .admin-post-sidebar .field-hint {
+  font-size: var(--paas-font-size-small);
+  font-weight: var(--paas-font-weight-body);
+  color: var(--paas-color-muted);
+}
+
+.lf-app-main .message[role="status"],
+.lf-app-main .admin-post-message {
+  color: var(--paas-color-body);
+}
+
+.lf-app-main .admin-post-status-published {
+  color: var(--paas-color-success-dark);
+}
+
+.lf-app-main .admin-post-status-draft {
+  color: var(--paas-color-error);
+}
+
+.lf-app-main .admin-grid {
+  font-size: var(--paas-font-size-table);
+  font-weight: var(--paas-font-weight-body);
+}
+
+/* Match Commerce .data-grid th */
+.lf-app-main .admin-grid thead th {
+  background-color: var(--paas-bg-table-heading);
+  border: 1px solid var(--paas-border-table-heading);
+  color: var(--paas-color-table-heading);
+  font-size: var(--paas-font-size-table-heading);
+  font-weight: var(--paas-font-weight-table-heading);
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+
+.lf-app-main .admin-list-band,
+.lf-app-main .admin-post-action-band,
+.lf-app-main .admin-post-sidebar,
+.lf-app-main .block-edit-page .lf-section-layout-header {
+  background: var(--paas-bg-collapsible);
+  border-color: var(--paas-border-light);
+}
+
+.lf-app-main .admin-ui-multiselect-trigger {
+  border-color: var(--paas-input-border);
+  background: var(--paas-input-bg);
+}
+
+.lf-app-main .admin-ui-multiselect.is-open .admin-ui-multiselect-trigger,
+.lf-app-main .admin-ui-multiselect-panel {
+  border-color: var(--paas-dropdown-border);
+  background: var(--paas-dropdown-bg);
+  box-shadow: 0 2px 6px var(--paas-dropdown-shadow);
+}
+
+.lf-app-main .admin-ui-multiselect-option:hover,
+.lf-app-main .admin-ui-multiselect-option:focus-within {
+  background: var(--paas-bg-hover);
+}
+
+.lf-app-main .admin-ui-multiselect-option input[type="checkbox"] {
+  accent-color: var(--paas-checkbox-checked);
+}
+
+.lf-app-main .admin-grid tbody tr:hover td {
+  background: var(--paas-bg-hover);
+}
+
+.lf-app-main .admin-grid tr.is-dragging td,
+.lf-app-main .admin-grid tbody tr.is-dragging {
+  background: var(--paas-bg-row-drag);
+}
+
+.lf-app-main .message.is-error,
+.lf-app-main .preview.is-error {
+  background: var(--paas-bg-error);
+  border: 1px solid var(--paas-error-border);
+  color: var(--paas-error-text);
+}
+
+.lf-app-main .lf-loading-mask-screen {
+  background: var(--paas-bg-overlay);
+}
+
+.lf-app-main .lf-loading-mask-local,
+.lf-app-main .lf-loading-mask:not(.lf-loading-mask-screen) {
+  background: var(--paas-loading-mask);
+}
+
+.lf-app-main .required {
+  color: var(--paas-color-error);
+}

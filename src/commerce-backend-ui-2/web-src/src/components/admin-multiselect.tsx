@@ -82,18 +82,29 @@ export function AdminMultiselect({
               {options.length === 0 ? (
                 <li className="admin-ui-multiselect-empty">No options yet.</li>
               ) : (
-                options.map(option => (
-                  <li key={option.value}>
-                    <label className="admin-ui-multiselect-option">
-                      <input
-                        type="checkbox"
-                        checked={values.includes(option.value)}
-                        onChange={() => toggle(option.value)}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  </li>
-                ))
+                options.map(option => {
+                  const checked = values.includes(option.value);
+                  return (
+                    <li key={option.value} role="presentation">
+                      <div
+                        className="admin-ui-multiselect-option"
+                        role="option"
+                        aria-selected={checked}
+                        onClick={() => toggle(option.value)}
+                        onKeyDown={event => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            toggle(option.value);
+                          }
+                        }}
+                        tabIndex={0}
+                      >
+                        <input type="checkbox" checked={checked} readOnly tabIndex={-1} aria-hidden="true" />
+                        <span className="admin-ui-multiselect-option-text">{option.label}</span>
+                      </div>
+                    </li>
+                  );
+                })
               )}
             </ul>
             <div className="admin-ui-multiselect-footer">
