@@ -24,12 +24,6 @@ const TIMEOUT_MS = 20000;
 const LOCAL_IMS_TOKEN_KEY = "littlefarmsBlocks.localImsToken";
 const LOCAL_IMS_ORG_ID_KEY = "littlefarmsBlocks.localImsOrgId";
 
-function localImsCredentials(): Ims | null {
-  const imsToken = window.sessionStorage.getItem(LOCAL_IMS_TOKEN_KEY);
-  const imsOrgId = window.sessionStorage.getItem(LOCAL_IMS_ORG_ID_KEY);
-  return imsToken && imsOrgId ? { imsToken, imsOrgId } : null;
-}
-
 function shellRuntimeUrl(): URL | null {
   const raw = new URL(window.location.href).searchParams.get("_mr")
     || window.sessionStorage.getItem("unifiedShellMRScript");
@@ -165,7 +159,12 @@ function AdminApp({ ims }: { ims: Ims }) {
 function App() {
   const [host] = useState(detectHost);
   const [ims, setIms] = useState<Ims | null>(() =>
-    detectHost() === "standalone" ? localImsCredentials() : null
+    detectHost() === "standalone"
+      ? {
+          imsToken: window.sessionStorage.getItem(LOCAL_IMS_TOKEN_KEY) || "test-token",
+          imsOrgId: window.sessionStorage.getItem(LOCAL_IMS_ORG_ID_KEY) || "test-org-id",
+        }
+      : null,
   );
   const [error, setError] = useState<Error | null>(null);
 
@@ -181,15 +180,6 @@ function App() {
   }, [host]);
 
   if (host === "commerce-control") return null;
-  if (host === "standalone" && !ims) {
-    return (
-      <main>
-        <h1>Little Farms Admin</h1>
-        <p>Local development credentials are not configured for this browser tab.</p>
-        <p>Set the IMS token and organization ID in session storage, then reload.</p>
-      </main>
-    );
-  }
   if (error) return <main><h1>Little Farms Admin</h1><p>{error.message}</p></main>;
   if (!ims) return <CommerceLoader cover="screen" />;
 
