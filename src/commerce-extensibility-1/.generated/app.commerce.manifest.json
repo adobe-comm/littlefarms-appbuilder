@@ -20,6 +20,51 @@
         "label": "Commerce GraphQL endpoint",
         "name": "COMMERCE_CORE_GRAPHQL_URL",
         "type": "url"
+      },
+      {
+        "default": "",
+        "description": "ACCS REST base through `/V1` (orders, custom attributes). Example: `https://na1-sandbox.api.commerce.adobe.com/<environment-id>/V1`",
+        "env": [
+          "saas"
+        ],
+        "label": "Commerce REST API base (V1)",
+        "name": "COMMERCE_CORE_REST_URL",
+        "type": "url"
+      }
+    ]
+  },
+  "eventing": {
+    "commerce": [
+      {
+        "events": [
+          {
+            "description": "Increment booked delivery slot counts from order custom attributes delivery_date_time and delivery_date_time_slot.",
+            "env": [
+              "saas"
+            ],
+            "fields": [
+              {
+                "name": "id"
+              },
+              {
+                "name": "increment_id"
+              },
+              {
+                "name": "custom_attributes"
+              }
+            ],
+            "label": "Order saved (after commit)",
+            "name": "observer.sales_order_save_commit_after",
+            "priority": true,
+            "runtimeActions": [
+              "littlefarms-appbuilder/delivery-slot-order-book"
+            ]
+          }
+        ],
+        "provider": {
+          "description": "Books delivery slot capacity when checkout completes.",
+          "label": "Little Farms Delivery Slot"
+        }
       }
     ]
   },
@@ -28,6 +73,6 @@
     "displayName": "Little Farms Admin",
     "id": "littlefarms-blocks",
     "upgradeMode": "manual",
-    "version": "1.0.2"
+    "version": "1.0.4"
   }
 }

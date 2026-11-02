@@ -8,5 +8,15 @@
     "label": "Commerce GraphQL endpoint",
     "name": "COMMERCE_CORE_GRAPHQL_URL",
     "type": "url"
+  },
+  {
+    "default": "",
+    "description": "ACCS REST base through `/V1` (orders, custom attributes). Example: `https://na1-sandbox.api.commerce.adobe.com/<environment-id>/V1`",
+    "env": [
+      "saas"
+    ],
+    "label": "Commerce REST API base (V1)",
+    "name": "COMMERCE_CORE_REST_URL",
+    "type": "url"
   }
 ]

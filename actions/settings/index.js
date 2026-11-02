@@ -7,6 +7,7 @@ const { createAttributeCatalog } = require('../block/lib/attribute-catalog')
 const { createAttributeState } = require('../block/lib/attribute-state')
 const { createBrandCache } = require('../brand/lib/brand-cache')
 const { createLocationCache } = require('../location/lib/location-cache')
+const { invalidateAllStorefrontSwrCaches } = require('../lib/storefront-swr-cache')
 const {
   migrationCatalog,
   migrationStatus,
@@ -25,6 +26,7 @@ async function flushStorefront (params) {
   await evalCache.invalidate('*')
   await brandCache.invalidateAll()
   await locationCache.invalidateAll()
+  await invalidateAllStorefrontSwrCaches(params)
 }
 
 async function attributeStatus (params) {

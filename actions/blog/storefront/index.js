@@ -3,19 +3,14 @@ const { errorResponse } = require('../../utils')
 const { withBlogEnvironmentParams } = require('../lib/blog-scope')
 const { createPostStore } = require('../lib/post-store')
 const { createCategoryStore } = require('../lib/taxonomy-store')
-
-function isWarmPing (params) {
-  if (params.warm === true || params.warm === 'true') return true
-  const payload = params.trigger_payload
-  if (!payload) return false
-  if (typeof payload === 'object') return payload.warm === true || payload.warm === 'true'
-  try {
-    const parsed = JSON.parse(payload)
-    return parsed.warm === true || parsed.warm === 'true'
-  } catch {
-    return false
-  }
-}
+const {
+  createBlogStorefrontCache,
+  listPostsKey,
+  listPostsByCategoryKey,
+  getPostKey,
+  listCategoriesKey,
+  mostReadKey
+} = require('../lib/storefront-cache')
 
 function optionalBoolean (value) {
   if (value == null || value === '') return undefined
@@ -36,29 +31,38 @@ function listFiltersFrom (params) {
   }
 }
 
+async function loadCached (cache, key, loadFresh, logger, logLabel) {
+  const result = await cache.getOrLoad(key, loadFresh, { logger })
+  logger.info(`${logLabel} (cache ${result.cacheStatus})`)
+  return result.body
+}
+
 async function main (params) {
   const logger = Core.Logger('blog-storefront', { level: params.LOG_LEVEL || 'info' })
 
   try {
-    if (isWarmPing(params)) {
-      return { statusCode: 200, body: { message: 'action is live' } }
-    }
-
     params = await withBlogEnvironmentParams(params)
     const operation = String(params.operation || '').trim().toLowerCase()
     const posts = createPostStore(params)
     const categories = createCategoryStore(params)
+    const cache = await createBlogStorefrontCache(params)
 
     if (operation === 'list-posts') {
       const page = Math.max(1, Number(params.page) || 1)
       const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20))
-      const body = await posts.listStorefront({
-        page,
-        pageSize,
-        filters: listFiltersFrom(params),
-        sort: 'newest'
-      })
-      logger.info(`Listed ${body.items.length} blog posts (page ${body.page})`)
+      const cacheParams = { page, pageSize, ...listFiltersFrom(params) }
+      const body = await loadCached(
+        cache,
+        listPostsKey(cacheParams),
+        () => posts.listStorefront({
+          page,
+          pageSize,
+          filters: listFiltersFrom(params),
+          sort: 'newest'
+        }),
+        logger,
+        `Listed blog posts page ${page}`
+      )
       return { statusCode: 200, body }
     }
 
@@ -70,40 +74,84 @@ async function main (params) {
         categoryUrlKey: params.categoryUrlKey
       })
       if (!categoryId) return errorResponse(404, 'Category not found.', logger)
-      const body = await posts.listStorefront({
+      const cacheParams = {
         page,
         pageSize,
-        filters: { ...listFiltersFrom(params), categoryId },
-        sort: 'newest'
-      })
-      logger.info(`Listed ${body.items.length} blog posts for category ${categoryId}`)
-      return { statusCode: 200, body: { categoryId, ...body } }
+        categoryId,
+        categoryUrlKey: params.categoryUrlKey,
+        ...listFiltersFrom(params)
+      }
+      const body = await loadCached(
+        cache,
+        listPostsByCategoryKey(cacheParams),
+        () => posts.listStorefront({
+          page,
+          pageSize,
+          filters: { ...listFiltersFrom(params), categoryId },
+          sort: 'newest'
+        }).then(listBody => ({ categoryId, ...listBody })),
+        logger,
+        `Listed blog posts for category ${categoryId}`
+      )
+      return { statusCode: 200, body }
     }
 
     if (operation === 'get-post') {
-      const post = await posts.getStorefront({
+      const cacheParams = {
         postId: params.postId,
         urlKey: params.urlKey || params.url_key
-      })
-      if (!post) return errorResponse(404, 'Post not found.', logger)
-      return { statusCode: 200, body: { post } }
+      }
+      const body = await loadCached(
+        cache,
+        getPostKey(cacheParams),
+        async () => {
+          const post = await posts.getStorefront({
+            postId: params.postId,
+            urlKey: params.urlKey || params.url_key
+          })
+          if (!post) {
+            const error = new Error('Post not found.')
+            error.statusCode = 404
+            throw error
+          }
+          return { post }
+        },
+        logger,
+        'Loaded blog post'
+      )
+      return { statusCode: 200, body }
     }
 
     if (operation === 'list-categories') {
-      const items = await categories.listStorefront()
-      logger.info(`Listed ${items.length} blog categories`)
-      return { statusCode: 200, body: { items } }
+      const body = await loadCached(
+        cache,
+        listCategoriesKey(),
+        async () => {
+          const items = await categories.listStorefront()
+          return { items }
+        },
+        logger,
+        'Listed blog categories'
+      )
+      return { statusCode: 200, body }
     }
 
     if (operation === 'most-read') {
       const limit = Math.min(50, Math.max(1, Number(params.limit) || 10))
-      const body = await posts.listStorefront({
-        page: 1,
-        pageSize: limit,
-        filters: listFiltersFrom(params),
-        sort: 'most_read'
-      })
-      return { statusCode: 200, body: { items: body.items } }
+      const cacheParams = { limit, ...listFiltersFrom(params) }
+      const body = await loadCached(
+        cache,
+        mostReadKey(cacheParams),
+        () => posts.listStorefront({
+          page: 1,
+          pageSize: limit,
+          filters: listFiltersFrom(params),
+          sort: 'most_read'
+        }).then(listBody => ({ items: listBody.items })),
+        logger,
+        'Listed most-read blog posts'
+      )
+      return { statusCode: 200, body }
     }
 
     if (operation === 'record-visit') {

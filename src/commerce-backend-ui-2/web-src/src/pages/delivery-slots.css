@@ -1,0 +1,358 @@
+/* Delivery Time Slot — PaaS Configuration section typography */
+.lf-delivery-config-page {
+  --lf-delivery-font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --lf-delivery-font-size: 14px;
+  --lf-delivery-font-weight: 400;
+  --lf-delivery-line-height: 19px;
+  --lf-delivery-color: #222;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  font-family: var(--lf-delivery-font-family);
+  font-size: var(--lf-delivery-font-size);
+  font-weight: var(--lf-delivery-font-weight);
+  line-height: var(--lf-delivery-line-height);
+  color: var(--lf-delivery-color);
+}
+
+.lf-delivery-config-page button,
+.lf-delivery-config-page input,
+.lf-delivery-config-page select,
+.lf-delivery-config-page table {
+  font-family: inherit;
+}
+
+html.lf-embed .lf-delivery-config-page {
+  min-height: auto;
+}
+
+.lf-delivery-config-sticky {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 17px 30px;
+  background: var(--paas-bg-body, #fff);
+  border-bottom: 1px solid var(--paas-border-light, #e3e3e3);
+}
+
+.lf-delivery-config-scope {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lf-delivery-config-scope strong {
+  font-size: var(--paas-font-size-label, 14px);
+  font-weight: var(--paas-font-weight-label, 600);
+}
+
+.lf-delivery-config-scope select {
+  min-width: 220px;
+  height: 32px;
+  padding: 4px 8px;
+}
+
+.lf-delivery-config-body {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+.lf-delivery-config-nav {
+  width: 240px;
+  flex-shrink: 0;
+  padding: 16px 0 24px;
+  border-right: 1px solid var(--paas-border-light, #e3e3e3);
+  background: #f5f5f5;
+}
+
+.lf-delivery-config-nav-title {
+  margin: 0 16px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paas-color-muted, #666);
+}
+
+.lf-delivery-config-nav button {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 12px 16px 12px 28px;
+  border: none;
+  background: transparent;
+  color: var(--paas-color-body, #222);
+  font-size: 14px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lf-delivery-config-nav button:hover {
+  background: var(--paas-bg-hover, #f8f8f8);
+}
+
+.lf-delivery-config-nav button.active {
+  background: var(--paas-bg-active, #fff);
+  font-weight: 700;
+  box-shadow: inset 4px 0 0 var(--paas-color-primary-orange, #eb5202);
+}
+
+.lf-delivery-config-main {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 30px 48px;
+  font-size: var(--lf-delivery-font-size);
+  font-weight: var(--lf-delivery-font-weight);
+  line-height: var(--lf-delivery-line-height);
+  color: var(--lf-delivery-color);
+}
+
+.lf-delivery-config-message {
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  background: var(--paas-info-bg, #e7f4f9);
+  border: 1px solid var(--paas-color-link, #007bdb);
+}
+
+.lf-delivery-section-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.lf-delivery-section-bar h1 {
+  margin-bottom: 0;
+  padding-top: 0;
+}
+
+.lf-delivery-section-toggle {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.lf-delivery-section-toggle-icon {
+  display: block;
+  width: 0;
+  height: 0;
+  margin: 0 auto;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 7px solid #666;
+  transition: transform 0.15s ease;
+}
+
+.lf-delivery-section-toggle.is-expanded .lf-delivery-section-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Magento system.xml form-list: td.label + td.value (see devtools on PaaS config) */
+.lf-delivery-config-main .form-list.lf-delivery-config-form {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+.lf-delivery-config-main .lf-delivery-config-form td.label {
+  width: 25%;
+  padding: 10px 15px 10px 0;
+  vertical-align: top;
+  text-align: right;
+  font-size: var(--lf-delivery-font-size);
+  font-weight: 600;
+  line-height: var(--lf-delivery-line-height);
+  color: var(--lf-delivery-color);
+}
+
+.lf-delivery-config-main .lf-delivery-config-form td.label label {
+  display: block;
+  margin: 0;
+  font-weight: inherit;
+  cursor: default;
+}
+
+.lf-delivery-config-main .lf-delivery-config-form td.value {
+  width: 75%;
+  padding: 10px 0 28px;
+  vertical-align: top;
+}
+
+.lf-delivery-config-main .lf-delivery-config-form tr.lf-delivery-slots-field-row:last-child td.value {
+  padding-bottom: 0;
+}
+
+.lf-delivery-config-main .lf-delivery-config-form .note.lf-delivery-slots-scope-tag {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--paas-color-gray, #999);
+  text-align: right;
+}
+
+/* PaaS field-array: grey panel wraps table + Add (see DeliveryDaysOptions). */
+.lf-delivery-slots-array-panel {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 20px 24px 16px;
+  background: var(--paas-bg-collapsible, #f8f8f8);
+  border: 1px solid #c2c2c2;
+  box-sizing: border-box;
+}
+
+.lf-delivery-config-main .admin__control-table.lf-delivery-slot-grid {
+  width: auto;
+  max-width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+/* PaaS field-array header: light grey bar, dark text, bottom border only (not data-grid black) */
+.lf-delivery-config-main .lf-delivery-slot-grid thead th {
+  background-color: #eee;
+  border: none;
+  border-bottom: 1px solid #ccc;
+  color: var(--lf-delivery-color);
+  font-size: var(--lf-delivery-font-size);
+  font-weight: 700;
+  line-height: var(--lf-delivery-line-height);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+/* PaaS field-array: compact columns (~576px total in td.value), not full-bleed inputs */
+.lf-delivery-config-main .lf-delivery-slot-grid thead th,
+.lf-delivery-config-main .lf-delivery-slot-grid tbody td {
+  white-space: nowrap;
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid thead th:nth-child(1),
+.lf-delivery-config-main .lf-delivery-slot-grid tbody td:nth-child(1),
+.lf-delivery-config-main .lf-delivery-slot-grid thead th:nth-child(2),
+.lf-delivery-config-main .lf-delivery-slot-grid tbody td:nth-child(2) {
+  min-width: 108px;
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid thead th:nth-child(3),
+.lf-delivery-config-main .lf-delivery-slot-grid tbody td:nth-child(3),
+.lf-delivery-config-main .lf-delivery-slot-grid thead th:nth-child(4),
+.lf-delivery-config-main .lf-delivery-slot-grid tbody td:nth-child(4) {
+  min-width: 72px;
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid thead th:nth-child(5),
+.lf-delivery-config-main .lf-delivery-slot-grid tbody td:nth-child(5) {
+  min-width: 56px;
+  text-align: center;
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid tbody td {
+  padding: 8px 10px;
+  vertical-align: middle;
+  border: 1px solid #adadad;
+  background: #eaeaea;
+  color: var(--lf-delivery-color);
+  font-size: var(--lf-delivery-font-size);
+  font-weight: var(--lf-delivery-font-weight);
+  line-height: var(--lf-delivery-line-height);
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid tbody tr:nth-child(even) td,
+.lf-delivery-config-main .lf-delivery-slot-grid tbody tr:hover td {
+  background: #eaeaea;
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid .admin__control-text {
+  width: 96px;
+  max-width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  background: #fff;
+  font-size: var(--lf-delivery-font-size);
+  font-weight: var(--lf-delivery-font-weight);
+  line-height: var(--lf-delivery-line-height);
+  color: var(--lf-delivery-color);
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid tbody td:nth-child(3) .admin__control-text,
+.lf-delivery-config-main .lf-delivery-slot-grid tbody td:nth-child(4) .admin__control-text {
+  width: 64px;
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid .lf-delivery-slots-action-cell {
+  padding-right: 0;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.lf-delivery-slots-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--paas-color-secondary, #514943);
+}
+
+.lf-delivery-slots-delete:hover:not(:disabled) {
+  color: var(--paas-color-primary-orange, #eb5202);
+}
+
+.lf-delivery-config-main .action-add.lf-delivery-slots-add-row {
+  margin-top: 12px;
+  padding: 6px 12px;
+  font-size: var(--paas-font-size-small, 12px);
+  font-weight: 400;
+  border: 1px solid var(--paas-border, #adadad);
+  background: var(--paas-bg-button, #fff);
+  color: var(--paas-color-dark, #303030);
+  cursor: pointer;
+}
+
+.lf-delivery-config-main .action-add.lf-delivery-slots-add-row:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lf-delivery-slots-special-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px 24px;
+  margin-bottom: 24px;
+}
+
+.lf-delivery-slots-special-meta label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.lf-delivery-slots-special-meta .lf-field-checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+  padding-top: 24px;
+}

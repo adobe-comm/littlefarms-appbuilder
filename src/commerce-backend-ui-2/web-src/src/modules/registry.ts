@@ -39,6 +39,12 @@ export const appModules: AppModuleDefinition[] = [
     available: true,
   },
   {
+    id: "delivery-slot-management",
+    menuLabel: "Delivery time slot",
+    pageTitle: "Delivery time slot",
+    available: true,
+  },
+  {
     id: "settings",
     menuLabel: "Settings",
     pageTitle: "Settings",

@@ -2,6 +2,7 @@ const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
 const { createTagStore } = require('../../lib/taxonomy-store')
 const { withBlogEnvironmentParams } = require('../../lib/blog-scope')
+const { invalidateBlogStorefrontCache } = require('../../lib/invalidate-blog-storefront-cache')
 
 async function main (params) {
   const logger = Core.Logger('blog-tag-write', { level: params.LOG_LEVEL || 'info' })
@@ -11,6 +12,7 @@ async function main (params) {
     const fields = params.fields && typeof params.fields === 'object' ? params.fields : {}
     const store = createTagStore(params)
     const tag = await store.save(fields, params.tagId)
+    await invalidateBlogStorefrontCache(params)
     logger.info(`Saved blog tag ${tag.tagId}`)
     return { statusCode: 200, body: { tag } }
   } catch (error) {

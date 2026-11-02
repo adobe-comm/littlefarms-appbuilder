@@ -221,9 +221,11 @@ function imageUrl (value, label) {
   try {
     parsed = new URL(url)
   } catch {
-    throw httpError(400, `${label} address is not valid.`)
+    throw httpError(400, `${label} address is not valid: ${url}`)
   }
-  if (parsed.protocol !== 'https:' || url.length > 2000) throw httpError(400, `${label} address is not valid.`)
+  if (parsed.protocol !== 'https:' || url.length > 2000) {
+    throw httpError(400, `${label} address is not valid: ${url}`)
+  }
   return url
 }
 

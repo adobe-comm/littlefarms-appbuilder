@@ -14,8 +14,9 @@
   --paas-font-size-input: 14px;
   --paas-font-size-button: 16px;
   --paas-font-size-small: 12px;
-  --paas-font-size-table: 14px;
-  --paas-font-size-table-heading: 14px;
+  --paas-font-size-table: 13px;
+  --paas-font-size-table-heading: 13px;
+  --paas-line-height-table: 18px;
   --paas-font-weight-table-heading: 700;
   /* Magento .data-grid th */
   --paas-color-table-heading: #fff;
@@ -162,7 +163,8 @@
 .lf-app-main .admin-list,
 .lf-app-main .lf-blog-module,
 .lf-app-main .lf-location-module,
-.lf-app-main .block-edit-page {
+.lf-app-main .block-edit-page,
+.lf-app-main .lf-delivery-config-page {
   background: var(--paas-bg-body);
 }
 
@@ -178,7 +180,8 @@
 .lf-app-main .admin-list-header h1,
 .lf-app-main .admin-post-edit-header h1,
 .lf-app-main .location-edit-page .lf-section-layout-header h1,
-.lf-app-main main.conditional-blocks > h1 {
+.lf-app-main main.conditional-blocks > h1,
+.lf-app-main .lf-delivery-config-main > h1 {
   color: var(--paas-color-heading);
   font-size: var(--paas-font-size-h1);
   font-weight: var(--paas-font-weight-h1);
@@ -186,6 +189,21 @@
   margin: 0;
   padding-top: 5px;
   word-break: break-all;
+}
+
+.lf-app-main .lf-delivery-config-main > h1,
+.lf-app-main .lf-delivery-section-bar h1 {
+  margin-bottom: 24px;
+  word-break: normal;
+}
+
+.lf-app-main .lf-delivery-section-bar h1 {
+  margin-bottom: 0;
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 19px;
+  color: #222;
 }
 
 .lf-app-main h2 {
@@ -323,8 +341,36 @@
 }
 
 .lf-app-main .admin-grid {
+  font-family: var(--paas-font-family);
   font-size: var(--paas-font-size-table);
   font-weight: var(--paas-font-weight-body);
+}
+
+/* Listing grids (Blocks, Brands, Locations, Blog, …) */
+.lf-app-main .admin-list .admin-grid tbody td {
+  color: var(--paas-color-dark);
+  font-family: var(--paas-font-family);
+  font-size: var(--paas-font-size-table);
+  font-weight: 400;
+  line-height: var(--paas-line-height-table);
+}
+
+/* Primary title / name column (location title, block name, post title, …) */
+.lf-app-main .admin-list .admin-grid .admin-grid-cell-title,
+.lf-app-main .admin-list .admin-grid .admin-row-link {
+  color: var(--paas-color-body);
+  font-family: var(--paas-font-family);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 19px;
+}
+
+.lf-app-main .admin-list .admin-record-count {
+  color: var(--paas-color-body);
+  font-family: var(--paas-font-family);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 19px;
 }
 
 /* Match Commerce .data-grid th */
@@ -332,11 +378,18 @@
   background-color: var(--paas-bg-table-heading);
   border: 1px solid var(--paas-border-table-heading);
   color: var(--paas-color-table-heading);
+  font-family: var(--paas-font-family);
   font-size: var(--paas-font-size-table-heading);
   font-weight: var(--paas-font-weight-table-heading);
+  line-height: var(--paas-line-height-table);
   text-transform: none;
   letter-spacing: normal;
   white-space: nowrap;
+}
+
+.lf-app-main .admin-list .admin-grid thead th {
+  color: #fff;
+  font-weight: 700;
 }
 
 .lf-app-main .admin-list-band,
@@ -370,6 +423,10 @@
 
 .lf-app-main .admin-grid tbody tr:hover td {
   background: var(--paas-bg-hover);
+}
+
+.lf-app-main .lf-delivery-config-main .lf-delivery-slot-grid tbody tr:hover td {
+  background: transparent;
 }
 
 .lf-app-main .admin-grid tr.is-dragging td,

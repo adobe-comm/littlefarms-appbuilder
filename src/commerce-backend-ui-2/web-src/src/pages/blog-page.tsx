@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { BlogSectionNav } from "../components/blog-section-nav.tsx";
+import { useEffect, useState } from "react";
 import { BlogCategoriesPage } from "./blog-categories-page.tsx";
 import { BlogPostsPage } from "./blog-posts-page.tsx";
 import { BlogTagsPage } from "./blog-tags-page.tsx";
@@ -13,14 +12,20 @@ type Ims = {
 
 type BlogPageProps = {
   ims: Ims;
+  initialSection?: BlogSectionId;
 };
 
-export function BlogPage({ ims }: BlogPageProps) {
-  const [activeSection, setActiveSection] = useState<BlogSectionId>("posts");
+export function BlogPage({ ims, initialSection }: BlogPageProps) {
+  const [activeSection, setActiveSection] = useState<BlogSectionId>(initialSection ?? "posts");
+
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection]);
 
   return (
     <div className="lf-blog-module">
-      <BlogSectionNav activeSection={activeSection} onSectionChange={setActiveSection} />
       {activeSection === "posts" ? (
         <BlogPostsPage ims={ims} onNavigateSection={setActiveSection} />
       ) : null}

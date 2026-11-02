@@ -1,22 +1,21 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { HashRouter, useLocation, useNavigate } from "react-router-dom";
 import { attach, register } from "@adobe/uix-guest";
 import Runtime, { init } from "@adobe/exc-app";
 
 import config from "../../../commerce-extensibility-1/.generated/app.commerce.config.js";
+import type { Ims } from "./app-types.ts";
+import { LauncherModuleRoutes, ModuleRoutes } from "./components/app-routes.tsx";
 import { AppShell, defaultAppModuleId } from "./components/app-shell.tsx";
-import { getAppModule } from "./modules/registry.ts";
+import { PathBootstrap, useSyncNavigationPath } from "./components/path-bootstrap.tsx";
+import {
+  isFeatureMenuRoute,
+  moduleRouteToPath,
+  parseRelativeAppPath,
+  type ModuleRoute,
+} from "./lib/module-route.ts";
 import { CommerceLoader } from "./components/commerce-loader.tsx";
-import { BrandsPage } from "./pages/brands-page.tsx";
-import { BlogPage } from "./pages/blog-page.tsx";
-import { LocationsPage } from "./pages/locations-module-page.tsx";
-import { MainPage } from "./pages/main-page.tsx";
-import { SettingsPage } from "./pages/settings-page.tsx";
-
-type Ims = {
-  imsToken: string;
-  imsOrgId: string;
-};
 
 type Host = "commerce-ui" | "commerce-control" | "shell" | "standalone";
 
@@ -24,29 +23,6 @@ const SHELL_RUNTIME_HOST = /^(exc-unifiedcontent\.)?experience(-qa|-stage|-cdn|-
 const TIMEOUT_MS = 20000;
 const LOCAL_IMS_TOKEN_KEY = "littlefarmsBlocks.localImsToken";
 const LOCAL_IMS_ORG_ID_KEY = "littlefarmsBlocks.localImsOrgId";
-const ACTIVE_MODULE_KEY = "littlefarms.admin.activeModule";
-const MODULE_HASH_PREFIX = "lf/";
-
-function moduleIdFromHash(): string | null {
-  const raw = window.location.hash.replace(/^#/, "").trim();
-  if (!raw.startsWith(MODULE_HASH_PREFIX)) return null;
-  const id = raw.slice(MODULE_HASH_PREFIX.length);
-  return getAppModule(id) ? id : null;
-}
-
-function readStoredModuleId(): string {
-  return moduleIdFromHash()
-    || getAppModule(window.sessionStorage.getItem(ACTIVE_MODULE_KEY) || "")?.id
-    || defaultAppModuleId;
-}
-
-function writeModuleRoute(moduleId: string) {
-  const nextHash = `#${MODULE_HASH_PREFIX}${moduleId}`;
-  if (window.location.hash !== nextHash) {
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
-  }
-  window.sessionStorage.setItem(ACTIVE_MODULE_KEY, moduleId);
-}
 
 function localImsCredentials(): Ims | null {
   const imsToken = window.sessionStorage.getItem(LOCAL_IMS_TOKEN_KEY);
@@ -118,37 +94,80 @@ function connectShell(): Promise<Ims> {
   });
 }
 
+function AdminApp({ ims }: { ims: Ims }) {
+  const [host] = useState(detectHost);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [navigationReady, setNavigationReady] = useState(false);
+  const onNavigationReady = useCallback(() => setNavigationReady(true), []);
+
+  const inCommerceEmbed = host === "commerce-ui" || host === "shell";
+  const useModuleLauncher =
+    inCommerceEmbed
+    || process.env.NODE_ENV === "development"
+    || new URLSearchParams(window.location.search).has("lfLauncher");
+
+  const featureMenuOpen = useModuleLauncher && isFeatureMenuRoute(location.pathname);
+
+  const activeModuleId = useMemo(() => {
+    const parsed = parseRelativeAppPath(location.pathname);
+    if (parsed && parsed !== "menu") {
+      return parsed.moduleId;
+    }
+    return defaultAppModuleId;
+  }, [location.pathname]);
+
+  useSyncNavigationPath(location.pathname, navigationReady);
+
+  useEffect(() => {
+    const embedClass = "lf-embed";
+    if (inCommerceEmbed) {
+      document.documentElement.classList.add(embedClass);
+    }
+    return () => document.documentElement.classList.remove(embedClass);
+  }, [inCommerceEmbed]);
+
+  useEffect(() => {
+    const legacy = window.location.hash.replace(/^#/, "").trim();
+    if (legacy.startsWith("lf/") || legacy === "lf") {
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+    }
+  }, []);
+
+  const navigateModule = (moduleId: string, section?: string) => {
+    const route: ModuleRoute = { moduleId, section };
+    navigate(moduleRouteToPath(route));
+  };
+
+  return (
+    <>
+      <PathBootstrap useModuleLauncher={useModuleLauncher} onReady={onNavigationReady} />
+      <AppShell
+        activeModuleId={activeModuleId}
+        featureMenuOpen={featureMenuOpen}
+        onModuleChange={navigateModule}
+        useModuleLauncher={useModuleLauncher}
+      >
+        {useModuleLauncher ? (
+          <LauncherModuleRoutes ims={ims} />
+        ) : (
+          <ModuleRoutes ims={ims} />
+        )}
+      </AppShell>
+    </>
+  );
+}
+
 function App() {
   const [host] = useState(detectHost);
   const [ims, setIms] = useState<Ims | null>(() =>
     detectHost() === "standalone" ? localImsCredentials() : null
   );
   const [error, setError] = useState<Error | null>(null);
-  const [activeModuleId, setActiveModuleId] = useState(readStoredModuleId);
-
-  useEffect(() => {
-    const embedClass = "lf-embed";
-    const embedded = host === "commerce-ui" || host === "shell";
-    if (embedded) {
-      document.documentElement.classList.add(embedClass);
-    }
-    return () => document.documentElement.classList.remove(embedClass);
-  }, [host]);
-
-  useEffect(() => {
-    writeModuleRoute(activeModuleId);
-  }, [activeModuleId]);
-
-  useEffect(() => {
-    const onHashChange = () => {
-      const fromHash = moduleIdFromHash();
-      if (fromHash && fromHash !== activeModuleId) {
-        setActiveModuleId(fromHash);
-      }
-    };
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, [activeModuleId]);
 
   useEffect(() => {
     const extensionId = config.metadata.id;
@@ -173,20 +192,12 @@ function App() {
   }
   if (error) return <main><h1>Little Farms Admin</h1><p>{error.message}</p></main>;
   if (!ims) return <CommerceLoader cover="screen" />;
-  return (
-    <AppShell activeModuleId={activeModuleId} onModuleChange={setActiveModuleId}>
-      {activeModuleId === "blocks-management" && <MainPage ims={ims} />}
-      {activeModuleId === "brands-management" && <BrandsPage ims={ims} />}
-      {activeModuleId === "locations" && <LocationsPage ims={ims} />}
-      {activeModuleId === "blog" && <BlogPage ims={ims} />}
-      {activeModuleId === "settings" && <SettingsPage ims={ims} />}
-      {activeModuleId !== "blocks-management" && activeModuleId !== "brands-management" && activeModuleId !== "locations" && activeModuleId !== "blog" && activeModuleId !== "settings" && (
-        <main className="conditional-blocks">
-          <p>This module is not available yet.</p>
-        </main>
-      )}
-    </AppShell>
-  );
+
+  return <AdminApp ims={ims} />;
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <HashRouter>
+    <App />
+  </HashRouter>,
+);

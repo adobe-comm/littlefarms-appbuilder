@@ -3,6 +3,7 @@ const { errorResponse } = require('../../../utils')
 const { withCommerceCoreGraphqlUrl } = require('../../../block/lib/enrich-commerce-params')
 const { createBrandStore } = require('../../lib/brand-store')
 const { createBrandCache } = require('../../lib/brand-cache')
+const { invalidateStorefrontSwrCache } = require('../../../lib/storefront-swr-cache')
 const { listDropdownAttributes } = require('../../lib/sync-options')
 
 function confirmed (value) {
@@ -36,6 +37,7 @@ async function main (params) {
       if (saved.changed) {
         const cache = await createBrandCache(params)
         await cache.invalidateAll()
+        await invalidateStorefrontSwrCache(params, 'brand')
       }
       logger.info(`Brand attribute ${saved.changed ? 'changed' : 'unchanged'}: ${saved.brandAttributeCode}`)
       return { statusCode: 200, body: saved }

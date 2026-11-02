@@ -2,6 +2,7 @@ const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
 const { createPostStore } = require('../../lib/post-store')
 const { withBlogEnvironmentParams } = require('../../lib/blog-scope')
+const { invalidateBlogStorefrontCache } = require('../../lib/invalidate-blog-storefront-cache')
 
 async function main (params) {
   const logger = Core.Logger('blog-post-write', { level: params.LOG_LEVEL || 'info' })
@@ -11,6 +12,7 @@ async function main (params) {
     const fields = params.fields && typeof params.fields === 'object' ? params.fields : {}
     const store = createPostStore(params)
     const post = await store.save(fields, params.postId)
+    await invalidateBlogStorefrontCache(params)
     logger.info(`Saved blog post ${post.postId}`)
     return { statusCode: 200, body: { post } }
   } catch (error) {

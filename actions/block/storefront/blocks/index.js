@@ -13,19 +13,9 @@ const {
   createRequestTimings,
   logRequestTimings
 } = require('../../lib/runtime-state')
+const { createStorefrontSwrCache, stableHash } = require('../../../lib/storefront-swr-cache')
 
-function isWarmPing (params) {
-  if (params.warm === true || params.warm === 'true') return true
-  const payload = params.trigger_payload
-  if (!payload) return false
-  if (typeof payload === 'object') return payload.warm === true || payload.warm === 'true'
-  try {
-    const parsed = JSON.parse(payload)
-    return parsed.warm === true || parsed.warm === 'true'
-  } catch {
-    return false
-  }
-}
+const BLOCK_LIST_SWR_KEY = 'block.storefront.list'
 
 function blockTitleFromParams (params) {
   return String(params.title || params.name || params.blockTitle || '').trim()
@@ -38,6 +28,14 @@ function blockIdFromParams (params) {
     if (Number.isInteger(value) && value > 0) return value
   }
   return null
+}
+
+function blockGetSwrKey (params) {
+  return `block.storefront.get.${stableHash({
+    blockId: blockIdFromParams(params),
+    id: String(params.id || '').trim(),
+    title: blockTitleFromParams(params)
+  })}`
 }
 
 async function loadPresetForGet (store, scope, params) {
@@ -78,87 +76,94 @@ function blockCacheIdentity (preset) {
   return id || null
 }
 
+async function loadGetBlockBody (params, logger, timings, profile) {
+  const scope = createPresetStore(params).scope()
+  const tokenProvider = createAccessTokenProvider(params)
+
+  const [resolvedParams, runtimeState, preset] = await Promise.all([
+    timings.track('config', () => withCommerceCoreGraphqlUrl(params)),
+    timings.track('stateInit', () => initRuntimeState(params)),
+    timings.track('db', async () => {
+      const accessToken = await tokenProvider.getAccessToken()
+      const store = createPresetStore({ ...params, __dbAccessToken: accessToken })
+      return loadPresetForGet(store, store.scope(), params)
+    })
+  ])
+
+  const cache = await createPresetResultCache(resolvedParams, null, { state: runtimeState })
+  const catalog = createAttributeCatalog(resolvedParams, {
+    state: runtimeState,
+    getAccessToken: refresh => tokenProvider.getAccessToken(refresh)
+  })
+  const context = { logger, cache, catalog }
+
+  const cacheId = blockCacheIdentity(preset)
+  if (cacheId) {
+    const cachedBlock = await timings.track('blockCacheRead', () =>
+      cache.getBlock(cacheId, preset.updatedAt)
+    )
+    if (cachedBlock) {
+      return { block: cachedBlock, blockCache: 'hit' }
+    }
+  }
+
+  const block = await timings.track('enrich', () =>
+    enrichPresetForStorefront(preset, resolvedParams, context)
+  )
+
+  if (cacheId) {
+    try {
+      await timings.track('blockCacheWrite', () =>
+        cache.putBlock(cacheId, preset.updatedAt, block)
+      )
+    } catch (cacheError) {
+      logger.warn(`Full block cache write failed for ${cacheId}: ${cacheError.message}`)
+    }
+  }
+
+  return { block, blockCache: cacheId ? 'miss' : 'skipped' }
+}
+
+async function loadListBody (params) {
+  const store = createPresetStore(params)
+  const scope = store.scope()
+  const presets = (await store.list(scope)).filter(preset => preset.enabled !== false)
+  const blocks = presets.map(toPublicBlock)
+  return { blocks }
+}
+
 async function main (params) {
   const logger = Core.Logger('block-storefront', { level: params.LOG_LEVEL || 'info' })
   const profile = shouldProfileRequest(params)
   const timings = createRequestTimings(profile)
 
   try {
-    if (isWarmPing(params)) {
-      return { statusCode: 200, body: { message: 'action is live' } }
-    }
-
     const operation = String(params.operation || 'list').trim().toLowerCase()
+    const swr = await createStorefrontSwrCache(params)
 
     if (operation === 'get') {
-      const scope = createPresetStore(params).scope()
-      const tokenProvider = createAccessTokenProvider(params)
-
-      const [resolvedParams, runtimeState, preset] = await Promise.all([
-        timings.track('config', () => withCommerceCoreGraphqlUrl(params)),
-        timings.track('stateInit', () => initRuntimeState(params)),
-        timings.track('db', async () => {
-          const accessToken = await tokenProvider.getAccessToken()
-          const store = createPresetStore({ ...params, __dbAccessToken: accessToken })
-          return loadPresetForGet(store, store.scope(), params)
-        })
-      ])
-
-      const cache = await createPresetResultCache(resolvedParams, null, { state: runtimeState })
-      const catalog = createAttributeCatalog(resolvedParams, {
-        state: runtimeState,
-        getAccessToken: refresh => tokenProvider.getAccessToken(refresh)
-      })
-      const context = { logger, cache, catalog }
-
-      const cacheId = blockCacheIdentity(preset)
-      if (cacheId) {
-        const cachedBlock = await timings.track('blockCacheRead', () =>
-          cache.getBlock(cacheId, preset.updatedAt)
-        )
-        if (cachedBlock) {
-          logger.info(`Block ${cacheId} served from State (full block)`)
-          logRequestTimings(logger, 'get', timings, { blockCache: 'hit' })
-          return { statusCode: 200, body: { block: cachedBlock } }
-        }
-      }
-
-      const block = await timings.track('enrich', () =>
-        enrichPresetForStorefront(preset, resolvedParams, context)
+      const key = blockGetSwrKey(params)
+      const result = await swr.getOrLoad(
+        key,
+        async () => {
+          const loaded = await loadGetBlockBody(params, logger, timings, profile)
+          return { block: loaded.block }
+        },
+        { logger }
       )
-
-      if (cacheId) {
-        try {
-          await timings.track('blockCacheWrite', () =>
-            cache.putBlock(cacheId, preset.updatedAt, block)
-          )
-        } catch (cacheError) {
-          logger.warn(`Full block cache write failed for ${cacheId}: ${cacheError.message}`)
-        }
-      }
-
-      logRequestTimings(logger, 'get', timings, { blockCache: cacheId ? 'miss' : 'skipped' })
-      return { statusCode: 200, body: { block } }
+      logRequestTimings(logger, 'get', timings, { swr: result.cacheStatus })
+      return { statusCode: 200, body: result.body }
     }
 
-    const store = createPresetStore(params)
-    const scope = store.scope()
-    const listCache = await createPresetResultCache(params)
-    const cached = await listCache.getList()
-    if (cached) {
-      logger.info('Block list served from State')
-      return { statusCode: 200, body: cached }
-    }
-
-    const presets = (await store.list(scope)).filter(preset => preset.enabled !== false)
-
-    const blocks = presets.map(toPublicBlock)
-    const body = { blocks }
-    await listCache.putList(body)
-    logger.info(`Stored ${blocks.length} blocks in State`)
+    const listResult = await swr.getOrLoad(
+      BLOCK_LIST_SWR_KEY,
+      () => loadListBody(params),
+      { logger }
+    )
+    logger.info(`Block list (${listResult.body.blocks?.length ?? 0} items, cache ${listResult.cacheStatus})`)
     return {
       statusCode: 200,
-      body
+      body: listResult.body
     }
   } catch (error) {
     logger.error(error)

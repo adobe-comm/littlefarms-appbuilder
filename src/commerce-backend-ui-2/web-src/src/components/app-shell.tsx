@@ -3,16 +3,21 @@ import {
   appModules,
   defaultAppModuleId,
 } from "../modules/registry.ts";
+import { ModuleLauncher } from "./module-launcher.tsx";
 
 const MODULE_NAV_COLLAPSED_KEY = "littlefarms.admin.moduleNavCollapsed";
 
 type AppShellProps = {
   activeModuleId: string;
-  onModuleChange: (moduleId: string) => void;
+  featureMenuOpen: boolean;
+  onModuleChange: (moduleId: string, section?: string) => void;
+  /** Content-style launcher + no Features rail (Commerce embed or local dev) */
+  useModuleLauncher?: boolean;
   children: ReactNode;
 };
 
-function readNavCollapsed(): boolean {
+function readNavCollapsed(useModuleLauncher: boolean): boolean {
+  if (useModuleLauncher) return true;
   try {
     return window.localStorage.getItem(MODULE_NAV_COLLAPSED_KEY) === "1";
   } catch {
@@ -20,21 +25,30 @@ function readNavCollapsed(): boolean {
   }
 }
 
-export function AppShell({ activeModuleId, onModuleChange, children }: AppShellProps) {
+export function AppShell({
+  activeModuleId,
+  featureMenuOpen,
+  onModuleChange,
+  useModuleLauncher = false,
+  children,
+}: AppShellProps) {
   const visibleModules = appModules.filter(module => module.available);
-  const [navCollapsed, setNavCollapsed] = useState(readNavCollapsed);
+  const [navCollapsed, setNavCollapsed] = useState(() => readNavCollapsed(useModuleLauncher));
 
   useEffect(() => {
+    if (useModuleLauncher) return;
     try {
       window.localStorage.setItem(MODULE_NAV_COLLAPSED_KEY, navCollapsed ? "1" : "0");
     } catch {
       // ignore private browsing / quota errors
     }
-  }, [navCollapsed]);
+  }, [navCollapsed, useModuleLauncher]);
 
   return (
-    <div className={`lf-app-shell${navCollapsed ? " lf-app-shell--nav-collapsed" : ""}`}>
-      {!navCollapsed && (
+    <div
+      className={`lf-app-shell${navCollapsed || useModuleLauncher ? " lf-app-shell--nav-collapsed" : ""}${useModuleLauncher ? " lf-app-shell--embedded" : ""}`}
+    >
+      {!useModuleLauncher && !navCollapsed && (
         <aside className="lf-module-rail" aria-label="Little Farms Admin features">
           <p className="lf-module-rail-heading">Features</p>
           <nav id="lf-module-nav" className="lf-module-nav">
@@ -65,7 +79,7 @@ export function AppShell({ activeModuleId, onModuleChange, children }: AppShellP
           </div>
         </aside>
       )}
-      {navCollapsed && (
+      {!useModuleLauncher && navCollapsed && (
         <button
           type="button"
           className="lf-module-rail-toggle lf-module-rail-toggle--expand"
@@ -78,7 +92,12 @@ export function AppShell({ activeModuleId, onModuleChange, children }: AppShellP
           <span className="lf-module-rail-toggle-label">Menu</span>
         </button>
       )}
-      <div className="lf-app-main">{children}</div>
+      <div className="lf-app-main">
+        {featureMenuOpen ? null : children}
+        {featureMenuOpen ? (
+          <ModuleLauncher onSelect={onModuleChange} />
+        ) : null}
+      </div>
     </div>
   );
 }

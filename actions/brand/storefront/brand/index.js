@@ -3,19 +3,7 @@ const { errorResponse } = require('../../../utils')
 const { ALL_STORE_VIEWS } = require('../../lib/constants')
 const { createBrandStore, storefrontBrand } = require('../../lib/brand-store')
 const { createBrandCache } = require('../../lib/brand-cache')
-
-function isWarmPing (params) {
-  if (params.warm === true || params.warm === 'true') return true
-  const payload = params.trigger_payload
-  if (!payload) return false
-  if (typeof payload === 'object') return payload.warm === true || payload.warm === 'true'
-  try {
-    const parsed = JSON.parse(payload)
-    return parsed.warm === true || parsed.warm === 'true'
-  } catch {
-    return false
-  }
-}
+const { createStorefrontSwrCache, stableHash } = require('../../../lib/storefront-swr-cache')
 
 function lookupFrom (params) {
   const id = String(params.id || '').trim()
@@ -74,17 +62,34 @@ async function rememberBrand (cache, storeViewCode, brand) {
   await Promise.all(writes)
 }
 
+function brandGetKey (storeViewCode, lookup) {
+  const kind = lookup.id ? 'id' : (lookup.name ? 'name' : 'alias')
+  const value = lookup.id || lookup.name || lookup.urlAlias
+  return `brand.storefront.get.${stableHash({ storeViewCode, kind, value })}`
+}
+
+function brandDirectoryKey (storeViewCode) {
+  return `brand.storefront.directory.${stableHash({ storeViewCode })}`
+}
+
+function brandListKey (storeViewCode, widget, page, pageSize, criteriaKey) {
+  return `brand.storefront.list.${stableHash({
+    storeViewCode,
+    widget,
+    page,
+    pageSize,
+    criteriaKey
+  })}`
+}
+
 async function main (params) {
   const logger = Core.Logger('brand-storefront', { level: params.LOG_LEVEL || 'info' })
 
   try {
-    if (isWarmPing(params)) {
-      return { statusCode: 200, body: { message: 'action is live' } }
-    }
-
     const operation = String(params.operation || '').trim().toLowerCase()
     const storeViewCode = storeViewFrom(params)
-    const cache = await createBrandCache(params)
+    const brandCache = await createBrandCache(params)
+    const swr = await createStorefrontSwrCache(params)
 
     if (operation === 'get') {
       const lookup = lookupFrom(params)
@@ -93,41 +98,53 @@ async function main (params) {
       }
       const kind = lookup.id ? 'id' : (lookup.name ? 'name' : 'alias')
       const value = lookup.id || lookup.name || lookup.urlAlias
-      const cached = await cache.getBrand(storeViewCode, kind, value)
-      if (cached) return { statusCode: 200, body: { brand: cached } }
-
-      const store = createBrandStore(params)
-      const settings = await store.getSettings()
-      const resolved = await store.findResolved({
-        attributeCode: settings.brandAttributeCode,
-        storeViewCode,
-        id: lookup.id,
-        name: lookup.name,
-        urlAlias: lookup.urlAlias
-      })
-      if (!resolved) return errorResponse(404, 'Brand not found.', logger)
-
-      const brand = storefrontBrand(resolved)
-      await rememberBrand(cache, storeViewCode, brand)
-      if (value !== brand.id && value !== brand.name && value !== brand.urlAlias) {
-        await cache.putBrand(storeViewCode, kind, value, brand)
-      }
-      return { statusCode: 200, body: { brand } }
+      const result = await swr.getOrLoad(
+        brandGetKey(storeViewCode, lookup),
+        async () => {
+          const store = createBrandStore(params)
+          const settings = await store.getSettings()
+          const resolved = await store.findResolved({
+            attributeCode: settings.brandAttributeCode,
+            storeViewCode,
+            id: lookup.id,
+            name: lookup.name,
+            urlAlias: lookup.urlAlias
+          })
+          if (!resolved) {
+            const error = new Error('Brand not found.')
+            error.statusCode = 404
+            throw error
+          }
+          const brand = storefrontBrand(resolved)
+          await rememberBrand(brandCache, storeViewCode, brand)
+          if (value !== brand.id && value !== brand.name && value !== brand.urlAlias) {
+            await brandCache.putBrand(storeViewCode, kind, value, brand)
+          }
+          return { brand }
+        },
+        { logger }
+      )
+      logger.info(`Brand get (cache ${result.cacheStatus})`)
+      return { statusCode: 200, body: result.body }
     }
 
     if (operation === 'directory') {
-      const cached = await cache.getDirectory(storeViewCode)
-      if (cached) return { statusCode: 200, body: cached }
-
-      const store = createBrandStore(params)
-      const settings = await store.getSettings()
-      const body = await store.listDirectory({
-        attributeCode: settings.brandAttributeCode,
-        storeViewCode
-      })
-      await cache.putDirectory(storeViewCode, body)
-      logger.info(`Stored brand directory for ${storeViewCode}: ${body.items.length}`)
-      return { statusCode: 200, body }
+      const result = await swr.getOrLoad(
+        brandDirectoryKey(storeViewCode),
+        async () => {
+          const store = createBrandStore(params)
+          const settings = await store.getSettings()
+          const body = await store.listDirectory({
+            attributeCode: settings.brandAttributeCode,
+            storeViewCode
+          })
+          await brandCache.putDirectory(storeViewCode, body)
+          return body
+        },
+        { logger }
+      )
+      logger.info(`Brand directory (cache ${result.cacheStatus})`)
+      return { statusCode: 200, body: result.body }
     }
 
     if (operation === 'list') {
@@ -140,21 +157,27 @@ async function main (params) {
       const cacheWidget = criteriaKey
         ? `${widget}.${pageSize}.detail.${Buffer.from(criteriaKey).toString('base64url')}`
         : `${widget}.${pageSize}.detail`
-      const cached = await cache.getWidgetPage(storeViewCode, cacheWidget, page)
-      if (cached) return { statusCode: 200, body: cached }
 
-      const store = createBrandStore(params)
-      const settings = await store.getSettings()
-      const body = await store.pageStorefront({
-        attributeCode: settings.brandAttributeCode,
-        storeViewCode,
-        widget: widget === 'ALL' ? undefined : widget,
-        page,
-        pageSize,
-        criteria
-      })
-      await cache.putWidgetPage(storeViewCode, cacheWidget, page, body)
-      return { statusCode: 200, body }
+      const result = await swr.getOrLoad(
+        brandListKey(storeViewCode, widget, page, pageSize, criteriaKey),
+        async () => {
+          const store = createBrandStore(params)
+          const settings = await store.getSettings()
+          const body = await store.pageStorefront({
+            attributeCode: settings.brandAttributeCode,
+            storeViewCode,
+            widget: widget === 'ALL' ? undefined : widget,
+            page,
+            pageSize,
+            criteria
+          })
+          await brandCache.putWidgetPage(storeViewCode, cacheWidget, page, body)
+          return body
+        },
+        { logger }
+      )
+      logger.info(`Brand list page ${page} (cache ${result.cacheStatus})`)
+      return { statusCode: 200, body: result.body }
     }
 
     return errorResponse(400, 'operation must be get, list, or directory.', logger)

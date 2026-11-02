@@ -11,6 +11,12 @@ const POST_STATUSES = ['draft', 'published']
 const IMAGE_KINDS = ['featured_image', 'mobile_image', 'listing_image']
 const CATEGORY_DISPLAY_MODES = ['blog_posts_only', 'static_block_only', 'posts_and_static_block']
 
+/** Storefront State SWR — fresh window (seconds). */
+const DEFAULT_BLOG_STOREFRONT_CACHE_FRESH_SECONDS = 60
+/** After fresh expires, serve stale up to this many seconds while revalidating in background. */
+const DEFAULT_BLOG_STOREFRONT_CACHE_SWR_SECONDS = 3600
+const BLOG_STOREFRONT_CACHE_MATCH = 'blog.storefront.*'
+
 module.exports = {
   POSTS_COLLECTION,
   CATEGORIES_COLLECTION,
@@ -20,5 +26,8 @@ module.exports = {
   MAX_POSTS,
   POST_STATUSES,
   IMAGE_KINDS,
-  CATEGORY_DISPLAY_MODES
+  CATEGORY_DISPLAY_MODES,
+  DEFAULT_BLOG_STOREFRONT_CACHE_FRESH_SECONDS,
+  DEFAULT_BLOG_STOREFRONT_CACHE_SWR_SECONDS,
+  BLOG_STOREFRONT_CACHE_MATCH
 }

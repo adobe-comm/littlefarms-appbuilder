@@ -1,5 +1,10 @@
 const { ALL_STORE_VIEWS } = require('../../../actions/location/lib/location-store')
-const { legacyLocationMediaUrl, legacyTeamProfileMediaUrl, isAbsoluteUrl } = require('./legacy-media-urls')
+const {
+  legacyLocationMediaUrl,
+  legacyTeamProfileMediaUrl,
+  isAbsoluteUrl,
+  DEFAULT_LOCATION_MEDIA_BASE
+} = require('./legacy-media-urls')
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 const DAY_NAME_TO_KEY = {
@@ -249,7 +254,7 @@ function buildTeamLinksByLocationId (teamRows) {
   return map
 }
 
-function mapCsvRowToLocationFields (row, { mediaBase = '' } = {}) {
+function mapCsvRowToLocationFields (row, { mediaBase = DEFAULT_LOCATION_MEDIA_BASE } = {}) {
   const fields = {}
   const skipped = []
 

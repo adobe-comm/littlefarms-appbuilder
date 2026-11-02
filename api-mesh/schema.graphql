@@ -95,6 +95,45 @@ input LittleFarmsProductSearchFilter {
   range: LittleFarmsProductSearchRange
 }
 
+type LittleFarmsDeliverySlotTime {
+  start_time: String
+  end_time: String
+  max_user: String
+  booked_count: String
+  remaining: Int
+}
+
+type LittleFarmsDeliverySlotDay {
+  sort_name: String
+  value: String
+  day_number: String
+  is_active: Boolean
+  time_slot: [LittleFarmsDeliverySlotTime!]!
+}
+
+type LittleFarmsDeliverySlotsPayload {
+  path: String
+  date: String
+  selectedDay: String
+  selectedTime: String
+  selectedTimeValid: Int
+  mixedCartBlocked: Boolean
+  message: String
+  offsetDeliveryFlag: Boolean
+  daySlot: [LittleFarmsDeliverySlotDay!]!
+}
+
+type LittleFarmsSaveOrderDeliverySlotPayload {
+  success: Boolean!
+  orderNumber: String!
+  storeViewCode: String
+  bookingApplied: Boolean!
+  released: Boolean
+  skipped: Boolean
+  reason: String
+  path: String
+}
+
 extend type Query {
   littleFarmsBlock(id: ID, title: String, blockId: Int, filter: [LittleFarmsProductSearchFilter!]): LittleFarmsBlock
   littleFarmsBlocks: [LittleFarmsBlock!]!
@@ -143,10 +182,20 @@ extend type Query {
     isRecipe: Boolean
     customerGroupId: Int
   ): [LittleFarmsBlogPostSummary!]!
+  littleFarmsDeliverySlots(skus: [String!]!, storeViewCode: String, deliveryDateTime: String, deliveryDateTimeSlot: String, specialCartMode: String, categoryIds: [String!]): LittleFarmsDeliverySlotsPayload!
+  littleFarmsDeliverySlotValidate(skus: [String!]!, storeViewCode: String, deliveryDateTime: String, deliveryDateTimeSlot: String, specialCartMode: String, categoryIds: [String!]): LittleFarmsDeliverySlotsPayload!
+  littleFarmsDeliveryOrderSlots(skus: [String!]!, storeViewCode: String, orderId: String, deliveryDateTime: String, deliveryDateTimeSlot: String, specialCartMode: String, categoryIds: [String!]): LittleFarmsDeliverySlotsPayload!
 }
 
 extend type Mutation {
   littleFarmsRecordBlogVisit(postId: Int, urlKey: String): LittleFarmsBlogVisitPayload!
+  littleFarmsSaveOrderDeliverySlot(
+    orderNumber: String!
+    deliveryDateTime: String!
+    deliveryDateTimeSlot: String!
+    storeViewCode: String
+    deliverySlotPath: String
+  ): LittleFarmsSaveOrderDeliverySlotPayload!
 }
 
 type LittleFarmsBrandsPayload {

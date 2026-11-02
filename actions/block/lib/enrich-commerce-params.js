@@ -1,6 +1,7 @@
 const { initialize, getConfigurationByKey, byCodeAndLevel } = require('@adobe/aio-commerce-lib-config')
 
-const CONFIG_KEY = 'COMMERCE_CORE_GRAPHQL_URL'
+const CONFIG_GRAPHQL_KEY = 'COMMERCE_CORE_GRAPHQL_URL'
+const CONFIG_REST_KEY = 'COMMERCE_CORE_REST_URL'
 const GLOBAL_SCOPE = byCodeAndLevel('global', 'global')
 
 let schemaInitPromise = null
@@ -31,7 +32,7 @@ async function resolveCommerceCoreGraphqlUrl (params) {
 
   await ensureBusinessConfigSchema()
   const encryptionKey = String(params.AIO_COMMERCE_CONFIG_ENCRYPTION_KEY || '').trim() || undefined
-  const result = await getConfigurationByKey(CONFIG_KEY, GLOBAL_SCOPE, { encryptionKey })
+  const result = await getConfigurationByKey(CONFIG_GRAPHQL_KEY, GLOBAL_SCOPE, { encryptionKey })
   const value = result?.config?.value
   if (typeof value === 'string' && value.trim()) {
     return value.trim()
@@ -48,7 +49,33 @@ async function withCommerceCoreGraphqlUrl (params) {
   return { ...params, COMMERCE_CORE_GRAPHQL_URL: url }
 }
 
+async function resolveCommerceCoreRestUrl (params) {
+  const fromEnv = String(params.COMMERCE_CORE_REST_URL || '').trim()
+  if (fromEnv) {
+    return fromEnv
+  }
+
+  await ensureBusinessConfigSchema()
+  const encryptionKey = String(params.AIO_COMMERCE_CONFIG_ENCRYPTION_KEY || '').trim() || undefined
+  const result = await getConfigurationByKey(CONFIG_REST_KEY, GLOBAL_SCOPE, { encryptionKey })
+  const value = result?.config?.value
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim()
+  }
+  return undefined
+}
+
+async function withCommerceCoreRestUrl (params) {
+  const url = await resolveCommerceCoreRestUrl(params)
+  if (!url) {
+    return params
+  }
+  return { ...params, COMMERCE_CORE_REST_URL: url }
+}
+
 module.exports = {
   withCommerceCoreGraphqlUrl,
-  resolveCommerceCoreGraphqlUrl
+  resolveCommerceCoreGraphqlUrl,
+  withCommerceCoreRestUrl,
+  resolveCommerceCoreRestUrl
 }

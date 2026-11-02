@@ -12,9 +12,9 @@
 | **Extension Name** | Little Farms Admin |
 | **App metadata id** | `littlefarms-blocks` |
 | **App metadata version** | 1.0.2 |
-| **Requirements doc version** | 2.1 |
+| **Requirements doc version** | 2.11 |
 | **Status** | in-development |
-| **Last Updated** | 2026-10-13 |
+| **Last Updated** | 2026-10-27 |
 | **Product Manager** | Product Manager Agent |
 | **Stakeholders** | Little Farms merchandising, storefront / EDS engineering |
 
@@ -30,7 +30,7 @@
 
 **Shipped / in progress:** **Brands** and **Locations** on the same Admin shell (`AppShell` module rail).
 
-**Next module (in requirements):** **Blog** — replace Aheadworks Blog admin for **categories**, **tags**, and **posts** on SaaS. Merchants want **two separate Commerce Admin menus** (not one shell with two rail items): **Blog Categories** and **Blogs** (posts). Admin UI SDK V2 allows **one menu item per App Builder application**, so categories and posts are **two deployable apps** (shared database and naming conventions are an implementation choice in Phase 2).
+**In requirements / upcoming:** **Blog** (two Commerce Admin apps for categories vs posts) and **Delivery Slot** — cart summary date/time picker, capacity-managed slots, and order fields on SaaS (replaces legacy `LittleFarms_Checkout` delivery flow). Delivery Slot **Phases 1–5 complete** (2026-10-27); launch validation (deploy smoke, EDS DS-14) remains on acceptance checklist.
 
 The app delivers shared runtime infrastructure (condition engine where needed, Admin SPA, App Builder actions, database persistence, Commerce catalog integration, caching).
 
@@ -73,6 +73,7 @@ The app delivers shared runtime infrastructure (condition engine where needed, A
 | **Blocks** (content + recommendation carousels, brands list, PDP rules) | **Shipped (v1)** | MainPage / block list & editor | API Mesh GraphQL + `block-storefront` / `block-evaluate` |
 | **Brands** | **Shipped / in progress** | AppShell rail → Brands | API Mesh GraphQL (by id, name, or URL alias) |
 | **Locations** | **Shipped / in progress** | AppShell rail → Locations | TBD |
+| **Delivery Slot** | **Phase 1 complete ✅** | AppShell rail → Delivery Slots (proposed) | API Mesh GraphQL + Commerce cart custom attributes (Phase 2) |
 | **Blog — Categories** | **Phase 1 complete ✅** | **Separate Commerce menu** → Blog Categories app | API Mesh GraphQL (Phase 2) |
 | **Blog — Posts** | **Phase 1 complete ✅** | **Separate Commerce menu** → Blogs app | API Mesh GraphQL (Phase 2) |
 
@@ -223,6 +224,10 @@ Merchants open **Blogs** (App Builder **App 2**). In addition to posts, they mus
 ### FR-12: Blog — post listing and CRUD (separate Admin menu)
 
 Merchants manage **posts** in App 2: **post listing grid** plus create/edit/delete on the **Edit Post** screen (fields per **Blog module**). Posts store **category ids** and **tag ids** only for related entities (no Authors, Comments, or Mail Log in App Builder). Category and tag pickers on the post form load options from the listing APIs (same collections).
+
+### FR-13: Delivery Slot module
+
+See **Delivery Slot module** below. **Delivery Slot Phase 1: Complete ✅** (2026-10-27). **Phase 2: Approved ✅**. **Phase 3: Option A** — `IMPLEMENTATION_PLAN.md` (Delivery Slot section).
 
 ---
 
@@ -570,6 +575,223 @@ Full design: **`ARCHITECTURE.md` → Brands module**. Approved 2026-10-05.
 
 ---
 
+## Delivery Slot module
+
+**Status:** **Delivery Slot Phase 1: Complete ✅** (2026-10-27). Phase 2 architecture not started.
+
+**Domain:** Cart-time delivery date/time selection, capacity-managed slots, and order persistence — **not** Checkout Starter Kit webhooks. Replaces legacy PaaS modules **`LittleFarms_Checkout`** (picker + quote save + place-order booking), **`lf_delivery` / `lf_special_delivery`** admin config, and **`LittleFarms_Sales`** (order display/reschedule). **`Brainvire_Sales`** is out of scope (no delivery logic). **`Brainvire_DeliveryDate`** offset messaging is **in scope** for parity (cart save / slot reset behavior).
+
+**Platform:** SaaS (ACCS), same App Builder project as **Little Farms Admin**. IMS mandatory. Storefront is **EDS / headless** via **API Mesh GraphQL** (same pattern as Blocks, Brands, Locations). Cart quote fields use **Commerce cart custom attributes** (GraphQL `setCustomAttributesOnCart`; attributes copy to the order on conversion — [setCustomAttributesOnCart](https://developer.adobe.com/commerce/webapi/graphql/schema/attributes/mutations/set-custom-cart)).
+
+**Reference behavior:** Legacy PaaS Magento repo **`/home/ranjeet/projects/littlefarms/littlefarms2024`** (authoritative for Phase 4 porting). Suggested implementation depth: **L2–L3**.
+
+### Legacy code map (CONFIRMED in `littlefarms2024`)
+
+| Concern | Module / path |
+|---------|----------------|
+| Cart picker + save quote | `app/code/LittleFarms/Checkout/` — `Controller/Cart/SavedDeliveryDateTime.php`, `Model/DeliverySlot.php`, `Model/Config.php`, `Model/SpecialDeliveryConfig.php` |
+| Quote/order columns | `LittleFarms/Checkout/etc/db_schema.xml` — `delivery_date_time`, `delivery_date_time_slot` |
+| Book on place order | `Observer/SalesConvertQuoteToOrder.php` |
+| Checkout gate | `Observer/ValidateDeliveryDateObserver.php` |
+| Daily reset cron | `Cron/DeliverySlotReset.php`, `etc/crontab.xml` — `1 0 * * *` |
+| Admin config paths | `lf_delivery/delivery_days_timeslot`, `lf_special_delivery/delivery_config/...` — `etc/adminhtml/system.xml` |
+| Post-order edit | `app/code/LittleFarms/Sales/` — `Controller/Order/SavedDeliveryDateTime.php`, `Controller/Adminhtml/Order/SavedDeliveryDateTime.php` |
+| Product **`days_availability`** | `app/code/LittleFarms/Catalog/` — EAV `days_availability` |
+| Product **`offset_delivery_date`** | `app/code/Brainvire/DeliveryDate/` — EAV `offset_delivery_date` |
+| Quote **`delivery_date_reset`** | `Brainvire/DeliveryDate/etc/db_schema.xml` on `quote` |
+| Mixed special + offset cart | `SpecialDeliveryConfig::isCartInSpecialItemWithSimple()` |
+
+**Cutoff constants (code):** `MORNING_SLOT = 12:00`, `EVENING_SLOT = 19:30`, morning slot starts `11:00`–`15:00` (`DeliverySlot.php` lines 18–29). Older written summaries used 13:00 / 20:30 — **implement from PHP constants above**.
+
+### Business objective
+
+Shoppers choose a **delivery date and time window** on the **cart summary** (not on checkout). Checkout opens only after a **valid slot is saved on the cart**. Capacity (**max** vs **booked**) is enforced when building selectable slots; **booked counts increment on place order**, not when the shopper confirms a slot on the cart.
+
+### Problem statement (legacy → SaaS)
+
+On PaaS, slot config lived in **Stores → Configuration** serialized arrays, PHP built the calendar, Knockout posted to **`SavedDeliveryDateTime`**, and observers gated checkout and updated booked counts. ACCS has **no in-process PHP**; config, slot logic, booking, and nightly reset must move to **App Builder** (Database + State + alarm trigger) with storefront UI owned by **EDS**.
+
+### Proposed solution (high level)
+
+| Layer | Responsibility |
+|-------|----------------|
+| **Admin UI** (AppShell module) | Configure **regular** weekday time slots and **special events** delivery (enable, order window, category offsets, per-weekday slots, capacity). Display **booked** counts (read-only for merchants; system updates on order). |
+| **App Builder actions** | Admin CRUD; **storefront** “available slots” for a cart context; optional **validate** saved slot; **book capacity** on order placed; **daily reset** for regular path (alarm). |
+| **API Mesh** | GraphQL for EDS: list slots, save slot (or orchestrate Commerce cart mutation), validation flags. |
+| **Commerce** | Cart custom attributes for `delivery_date_time`, `delivery_date_time_slot`, optional `delivery_date_reset`; product attributes **`days_availability`**, **`offset_delivery_date`** (must exist on catalog — codes confirmed in Phase 2). |
+| **Storefront (EDS)** | Date/time picker on cart summary; **Proceed to checkout** blocked until slot valid; call Mesh + Commerce mutations. |
+
+Checkout webhooks (payment/shipping/tax) are **N/A**.
+
+### Path selection (regular vs special)
+
+Same decision tree as legacy — evaluated server-side when building slots for the cart:
+
+| Condition | Config | Result |
+|-----------|--------|--------|
+| Special delivery **enabled** AND cart has a product in a configured **special category** | Special events config | **Special** calendar |
+| Otherwise | Regular delivery config | **Regular** calendar (7-day window) |
+
+**Mixed cart:** If special delivery is active and the cart is treated as **regular + pre-order/special mixed**, show a blocking message and **no selectable dates** (legacy parity).
+
+### Legacy parity matrix
+
+| Rule | Regular (`lf_delivery`) | Special (`lf_special_delivery`) | SaaS v1 target |
+|------|-------------------------|-----------------------------------|----------------|
+| Slot source | Weekday rows: Start, End, Max, Booked (single **booked_count** per row) | Same columns; **booked** = JSON **date → count** | **Parity** |
+| Calendar horizon | Next **7 days** incl. today | First day = today + **max category offset** in cart; last = **order_end_date** + offset | **Parity** |
+| Order window | N/A | Today must be between **order_start_date** and **order_end_date** | **Parity** |
+| Capacity filter | Show slot if `max_user - booked > 0` | Same per **calendar date** for that row | **Parity** |
+| Time cutoffs (store TZ) | **12:00 / 19:30** store local (see legacy `DeliverySlot.php`); morning window **11:00–15:00** start times | **No** cutoffs | **Parity** (port from code, not PDF summary) |
+| Product **days_availability** | Intersection across cart line items; empty = all days | Same | **Parity** |
+| **offset_delivery_date** | Shortens weekday list (legacy splices shared weekday array from index 4) | Same product rules where applicable | **Parity** (exact splice semantics verified in Phase 2) |
+| Save slot | Writes quote only; **does not** change booked | Same | **Parity** via `setCustomAttributesOnCart` |
+| Place order | Copy to order; increment **booked** on matching row (weekday vs date JSON) | Same | **Parity** (event/trigger TBD Phase 2) |
+| Nightly reset | Cron **00:01** zeros **yesterday’s weekday** booked (regular only) | No reset | **Parity** via App Builder alarm |
+| Order view change slot | Updates **order** fields only; **does not** adjust booked | Same | **Launch (MVP-D)** — legacy **`LittleFarms_Sales`** parity |
+| Brainvire offset cart message | Reset slot + message on cart save when offset product rules apply | Same | **Parity** (storefront + validation action) |
+
+### Cart and order field contract (proposed)
+
+Aligned with legacy column semantics; **attribute codes** must be registered in Commerce (OOPE custom attributes or equivalent) — confirm in Phase 2.
+
+| Field | Example | Set when |
+|-------|---------|----------|
+| `delivery_date_time` | `2026-10-27 16:00:00` | Shopper confirms slot (`{Y-m-d} {start_time}`) |
+| `delivery_date_time_slot` | `16:00-22:00` | Shopper confirms slot (`{start}-{end}`) |
+| `delivery_date_reset` | `1` | Optional flag when cart contains **offset_delivery_date** product (legacy parity) |
+
+Display label on cart button (storefront): **`l, d F Y(start-end)`** e.g. `Monday, 26 October 2026(16:00-22:00)`. If saved slot is past or not in built list, clear label and treat as **selectedTimeValid = 0** (dropdown opens on load).
+
+### Admin configuration (merchant)
+
+**Screen 1 — Regular delivery time slots** (legacy: *LittleFarms → Delivery Time Slot*)
+
+- Per weekday (Sunday–Saturday): grid of **Start Time**, **End Time**, **Max** (`max_user`), **Booked** (read-only, system-maintained).
+- Scope: store view (match Locations/Brands patterns unless Phase 2 chooses global).
+
+**Screen 2 — Special events delivery** (legacy: *LittleFarms → Special Events Delivery*)
+
+| Setting | Purpose |
+|---------|---------|
+| Enable | Turns special calendar on |
+| Order start / end date | Special dates built only while “today” is in window |
+| Delivery days and category | Rows: **category** + **offset days**; cart uses **highest offset** among categories present |
+| Weekday time slots | Same columns as regular; **booked** shown as per-date JSON summary in Admin (read-only detail) |
+
+### Storefront behavior (EDS)
+
+1. **Placement:** Cart summary, **before** checkout button (not on checkout page).
+2. **Load:** Call Mesh → available days/times for current cart (ids/SKUs/categories/store view + server “now”).
+3. **Confirm:** Persist slot via Commerce **`setCustomAttributesOnCart`** (Mesh may wrap this for a single client endpoint).
+4. **Proceed to checkout:** If day or time empty, open picker and **do not** navigate to checkout.
+5. **Checkout gate:** If slot missing, invalid (**selectedTimeValid = 0**), or mixed special cart — block checkout and clear invalid slot (storefront + server validation where possible).
+
+### Functional requirements (module)
+
+| ID | Requirement |
+|----|-------------|
+| DS-FR-1 | Admin can configure regular weekday slots (start, end, max) per store view. |
+| DS-FR-2 | Admin can configure special events delivery (enable, dates, category offsets, weekday slots). |
+| DS-FR-3 | Storefront receives available slots reflecting capacity, cutoffs (regular only), product **days_availability**, and path selection (regular vs special). |
+| DS-FR-4 | Shopper can save a slot on the cart; values persist on the cart and copy to the order on place order. |
+| DS-FR-5 | Checkout cannot complete without a valid saved slot (storefront gate; supplemental server checks in Phase 2). |
+| DS-FR-6 | On successful order placement, increment **booked** on the correct config row (regular weekday vs special date JSON). |
+| DS-FR-7 | Regular path: scheduled job resets prior weekday **booked** counts daily (legacy ~00:01 store time). |
+| DS-FR-8 | Mixed special + regular cart shows error and no selectable dates when legacy rules apply. |
+| DS-FR-9 | Offset-product rules can invalidate/resets slot and show configured message (Brainvire_DeliveryDate parity). |
+| DS-FR-10 | Order confirmation and order view display **delivery date/time** from order custom attributes. |
+| DS-FR-11 | **Legacy post-order edit (MVP-D):** Customer (**My orders** / order detail on storefront) and merchant (**order view in Admin**) can change `delivery_date_time` and `delivery_date_time_slot` on an existing order; **booked counts are not updated** on edit (same as legacy). Reschedule UI may offer any **valid** slot (legacy does not re-book capacity). |
+
+### Incremental delivery (recommended)
+
+| Milestone | Scope |
+|-----------|--------|
+| **MVP-A** | Regular path only: admin, 7-day picker, cart save, checkout gate, book on order, daily reset |
+| **MVP-B** | Special events path + offsets + JSON booked |
+| **MVP-C** | Product days_availability, offset_delivery_date, mixed-cart messaging |
+| **MVP-D** | Customer/admin **change slot on order view** (no booked adjustment) |
+
+**Launch scope (decided):** **MVP-A + MVP-B + MVP-C + MVP-D** — full legacy parity: regular + special paths, product **`days_availability`** / **`offset_delivery_date`** / mixed-cart rules, and post-order slot edit.
+
+### Storage (proposed — confirm in Phase 2)
+
+| Data | Service | Notes |
+|------|---------|--------|
+| Regular + special slot config, special metadata | **Database** (`aio-lib-db`) | Source of truth; scoped by environment + store view |
+| Storefront slot list payloads | **State** (`aio-lib-state`) | TTL; invalidate on admin save, booking, reset |
+| — | **Files** | Not required v1 |
+
+### Testing
+
+Recommendations only unless requested: admin slot CRUD, capacity edge (max reached), cutoff times (regular), special window boundaries, cart save + order copy, booking idempotency, reset job. No generated test suite in Phase 1.
+
+### Documentation sources
+
+| Topic | Source |
+|-------|--------|
+| Cart custom attributes | [setCustomAttributesOnCart](https://developer.adobe.com/commerce/webapi/graphql/schema/attributes/mutations/set-custom-cart) |
+| Custom attribute definitions (SaaS) | [OOPE custom attributes](https://developer.adobe.com/commerce/extensibility/oope-modules/custom-attributes) — Phase 2 |
+| Scheduled reset | [App Builder triggers](https://developer.adobe.com/app-builder/docs/guides/runtime_guides/reference_docs/triggersrules) — alarm trigger |
+| Storefront pattern | `api-mesh/README.md`, `docs/storefront-contract.md` (Blocks/Locations) |
+
+### Product decisions (resolved)
+
+| # | Topic | Decision | Date |
+|---|--------|----------|------|
+| OQ-1 | **Release scope** | **MVP-A + MVP-B** at launch (regular + special events) | 2026-10-27 |
+| OQ-2 | **Custom attribute codes** | **Legacy names:** `delivery_date_time`, `delivery_date_time_slot`, `delivery_date_reset` (optional) | 2026-10-27 |
+| OQ-5 | **Config migration** | **Start fresh** on SaaS (no import of PaaS booked/max from `core_config_data`) | 2026-10-27 |
+| OQ-6 | **Order slot edit (MVP-D)** | **Legacy parity at launch** — customer (storefront order view) + CS (Commerce Admin order view); update order fields only; **no** booked-count change on edit | 2026-10-27 |
+| OQ-3 | **Order-placed booking** | **`observer.checkoutsubmitallafter`** → runtime action `delivery-slot-order-book` with idempotent DB; verify headless path in Phase 4 | 2026-10-27 (architect) |
+| OQ-4 | **Store timezone** | **Commerce store timezone** per `storeViewCode` (fallback logged) | 2026-10-27 (architect) |
+| MVP-C | **Product day rules at launch** | **Legacy parity** — `days_availability` intersection, `offset_delivery_date` weekday splice + `delivery_date_reset`, mixed special/regular cart blocking | 2026-10-27 |
+| OQ-7 | **Product attributes on ACCS** | **Confirmed ✅** (2026-10-27) in Commerce Admin: `days_availability` (Multiple Select), `days_availability_info` (Text Area), `offset_delivery_date` (Yes/No). Slot logic uses **`days_availability`** + **`offset_delivery_date`** only; `days_availability_info` is display-only. Recommend GraphQL read on a sample SKU before go-live. | Merchandising |
+
+### Open decisions (Phase 2)
+
+| # | Topic | Options / notes | Owner |
+|---|--------|-----------------|--------|
+| — | *(none for product catalog attrs)* | OQ-7 closed | — |
+
+### OQ-6 — Post-order slot change (MVP-D) explained
+
+On **legacy PaaS**, **`LittleFarms_Sales`** (not the cart picker in `LittleFarms_Checkout`) lets staff and customers **change** the delivery date/time **after** the order exists:
+
+| Surface | Who | What happens |
+|---------|-----|----------------|
+| **Customer order view** (“My orders”) | Shopper | Same calendar pattern as cart; confirm posts to a **SavedDeliveryDateTime**-style endpoint for **orders** |
+| **Admin order view** | Merchant / CS | Same idea in adminhtml — edit slot on the order |
+
+**What updates:** Only **`sales_order.delivery_date_time`** and **`sales_order.delivery_date_time_slot`** (same formats as on the quote).
+
+**What does *not* update (legacy parity):** **`booked_count`** in regular or special config. The original slot’s capacity is **not** decremented back, and the **new** slot’s capacity is **not** incremented. So post-order edits are a **fulfillment convenience**, not a second booking pass — two orders can appear to “share” capacity logic incorrectly if CS moves orders onto nearly full slots.
+
+**Contrast with launch scope A+B:**
+
+| Capability | Milestone | Typical effort |
+|------------|-----------|----------------|
+| Show date/time on order confirmation and order detail | **DS-FR-10** (read-only) | Low — read order custom attributes on EDS |
+| Let customer or admin **pick a new** slot on an existing order | **MVP-D** | Medium — order-scoped slot API, validation UI on EDS + optional Admin, auth (customer owns order), same cutoff/capacity rules as cart |
+
+**If MVP-D at launch:** Plan EDS order-detail picker + APIs; decide whether edits must respect **live capacity** (stricter, fair) or **allow any valid slot** like legacy (simpler, can overbook visually).
+
+**Product decision (OQ-6):** **Ship MVP-D at launch** with legacy behavior (order fields only; booked counts unchanged on reschedule). Phase 2 will specify SaaS surfaces: **EDS** for customer order view; **Commerce Admin order UI** (or equivalent) for CS — matching **`LittleFarms_Sales`**, not the cart module.
+
+### Phase markers
+
+| Phase | Status |
+|-------|--------|
+| Phase 1 — requirements | **Complete ✅** (2026-10-27) |
+| Phase 2 — architecture | **Complete ✅ Approved** (2026-10-27) — `ARCHITECTURE.md` → Delivery Slot module v0.2 |
+| Phase 3 — implementation approach | **Option A ✅** — `IMPLEMENTATION_PLAN.md` → Delivery Slot module (2026-10-27) |
+| Phase 4 — implementation | **Complete ✅** (2026-10-27) — Runtime actions, Mesh, Admin UI (regular + special weekday grids); **follow-up:** special **category offset** grid UI, EDS (DS-14), launch acceptance tests |
+| Phase 5 — cleanup & deploy readiness | **Complete ✅** (2026-10-27) — No unused delivery scaffolding; config verified; deploy checklist below |
+
+**Delivery Slot Phase 2: Approved ✅** (2026-10-27, user).
+
+---
+
 ## Alignment decisions
 
 | Item | Decision |
@@ -590,6 +812,10 @@ Full design: **`ARCHITECTURE.md` → Brands module**. Approved 2026-10-05.
 | Blog admin menus | **Two App Builder apps** — Blog Categories menu + Blogs (posts) menu; not modules on Little Farms Admin rail |
 | Blog related records | **Category** and **Tag** only in App Builder; Authors and Comments out of scope v1 |
 | Blog collections (proposed) | **`littlefarms_blog_categories`**, **`littlefarms_blog_tags`**, **`littlefarms_blog_posts`** |
+| Delivery Slot admin entry | **AppShell rail → Delivery Slots** (proposed id `delivery-slot-management`) |
+| Delivery Slot cart fields | Legacy codes **`delivery_date_time`**, **`delivery_date_time_slot`**, optional **`delivery_date_reset`** on cart → copy to order |
+| Delivery Slot launch scope | **MVP-A + B + C + D** (full legacy parity); config **greenfield** (no PaaS booked/max import) |
+| Delivery Slot collections (proposed) | **`littlefarms_delivery_regular`**, **`littlefarms_delivery_special`** (names TBD Phase 2) |
 | Concepts | `docs/blocks-concepts.md` |
 
 ---
@@ -639,6 +865,22 @@ Full design: **`ARCHITECTURE.md` → Brands module**. Approved 2026-10-05.
 
 - [x] Blog Phase 1: Complete ✅ (2026-10-13)
 
+**Delivery Slot module (App Builder — post Phase 5)**
+
+- [x] AppShell module **Delivery Slots** (`delivery-slot-management`) on Little Farms Admin
+- [x] Admin: regular weekday slots (start, end, max, booked read-only) — PaaS-style UI
+- [x] Admin: special events — enable, order window, weekday slots (**category offset grid UI deferred**; API/`special-write` supports `categoryOffsets`)
+- [x] Runtime: admin, storefront, order-book, daily reset + Mesh resolvers
+- [x] Storefront contract doc — `docs/delivery-slot-storefront-contract.md`
+- [ ] **Deploy smoke** on target workspace (user-run): save/load admin, invoke storefront, order-book after place order
+- [ ] Storefront GraphQL consumed on EDS + cart gate (DS-14)
+- [ ] Cart save via Commerce `setCustomAttributesOnCart` on EDS (DS-1 verified on stage for test cart)
+- [ ] Book capacity on order placed; daily reset verified in stage
+- [ ] Product `days_availability` / offset rules end-to-end (MVP-C)
+- [ ] Order view display (DS-FR-10) and post-order edit (DS-FR-11 / MVP-D) on EDS + Admin
+
+- [x] Delivery Slot Phase 1: Complete ✅ (2026-10-27)
+
 ---
 
 ## Change Log
@@ -658,3 +900,14 @@ Full design: **`ARCHITECTURE.md` → Brands module**. Approved 2026-10-05.
 | 1.9 | 2026-10-05 | Agent | Phase 3 Option A. Implementation plan and starter-kit discovery recorded |
 | 2.0 | 2026-10-13 | Agent | **Blog module** Phase 1: two Commerce menus (two apps), Category/Tag/Post field model from Aheadworks Edit Post screenshots; Authors/Comments out of scope; FR-10–FR-12 |
 | 2.1 | 2026-10-13 | Agent | Blog: explicit **listing + CRUD screens** for categories (App 1) and tags (App 2); posts listing; proposed admin actions; in-app Posts/Tags nav |
+| 2.2 | 2026-10-27 | Agent | **Delivery Slot module** Phase 1: legacy parity matrix, FR-13, cart custom attribute strategy, MVP milestones, open decisions OQ-1–OQ-7 |
+| 2.3 | 2026-10-27 | Agent | Delivery Slot: **OQ-1** MVP-A+B, **OQ-2** legacy attribute names, **OQ-5** greenfield; **OQ-6** explanation for post-order edit |
+| 2.4 | 2026-10-27 | Agent | **OQ-6:** legacy parity — **MVP-D at launch** (DS-FR-11); launch scope A+B+D |
+| 2.5 | 2026-10-27 | Agent | Phase 2 architecture in `ARCHITECTURE.md`; resolved OQ-3/OQ-4; Phase 2 pending approval |
+| 2.6 | 2026-10-27 | Agent | **MVP-C** at launch — legacy product day/offset/mixed-cart rules (A+B+C+D) |
+| 2.7 | 2026-10-27 | Agent | Legacy code map from `littlefarms2024`; cutoff times corrected to 12:00/19:30 from `DeliverySlot.php` |
+| 2.8 | 2026-10-27 | User | **Delivery Slot Phase 2 architecture approved** |
+| 2.9 | 2026-10-27 | User | **Phase 3 Option A** — Delivery Slot implementation plan in `IMPLEMENTATION_PLAN.md` |
+| 2.10 | 2026-10-27 | User | **OQ-7:** ACCS Admin confirms product attrs `days_availability`, `days_availability_info`, `offset_delivery_date` |
+| 2.11 | 2026-10-27 | User | **DS-1 (cart):** `setCustomAttributesOnCart` verified on stage — `delivery_date_time`, `delivery_date_time_slot` on cart |
+| 2.12 | 2026-10-27 | User | **Delivery Slot Phase 4 & 5 complete** — deploy checklist in `IMPLEMENTATION_PLAN.md`; category-offset admin UI + EDS remain follow-up |

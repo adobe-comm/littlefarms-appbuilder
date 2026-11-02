@@ -437,6 +437,7 @@ Numeric operators coerce both sides to numbers. If either side is not a number, 
 | 1.0 | 2026-09-28 | Solutions Architect Agent | Approved for implementation by the user. |
 | 1.1 | 2026-10-05 | Solutions Architect Agent | Brands module architecture draft. Blocks section above is unchanged. |
 | 1.2 | 2026-10-05 | Solutions Architect Agent | Brands module architecture approved. |
+| 1.3 | 2026-10-27 | Solutions Architect Agent | Delivery Slot module architecture draft (Phase 2). |
 
 ---
 
@@ -691,3 +692,290 @@ Recommendations only, per requirements. Manual checks: select an attribute, conf
 |------|------|------|
 | Architect | Solutions Architect Agent | 2026-10-05 |
 | Technical Lead | User approval | 2026-10-05 |
+
+---
+
+## Delivery Slot module
+
+<!--
+  Phase 2 for Delivery Slot. Blocks and Brands sections above are unchanged.
+  Requirements: REQUIREMENTS.md v2.8, Delivery Slot module.
+-->
+
+### Document control
+
+| Field | Value |
+|-------|-------|
+| **Version** | 0.3 |
+| **Status** | approved |
+| **Last Updated** | 2026-10-27 |
+| **Architect** | Solutions Architect Agent |
+| **Requirements Source** | REQUIREMENTS.md v2.8, Delivery Slot module |
+| **Legacy reference repo** | `/home/ranjeet/projects/littlefarms/littlefarms2024` (`LittleFarms_Checkout`, `LittleFarms_Sales`, `Brainvire_DeliveryDate`) |
+| **Launch scope** | MVP-A + MVP-B + MVP-C + MVP-D; greenfield config; legacy attribute codes |
+
+### Environment
+
+| Aspect | Value |
+|--------|-------|
+| **Platform** | SaaS (ACCS) |
+| **Application Type** | Admin UI SDK V2 SPA + API Mesh + Commerce GraphQL (cart/order) |
+| **Runtime** | Node.js 22 |
+| **App** | Existing `littlefarms-appbuilder` |
+
+Checkout Starter Kit **webhooks are not used**. Slot logic is **cart-time** (storefront + Commerce custom attributes) and **post-order** (display/reschedule + async booking).
+
+### Webhook Validation Table
+
+No Commerce checkout webhook applies (not payment, shipping, or tax). Admin and storefront use HTTPS actions and GraphQL.
+
+| Target domain | Action | Webhook method name | Webhook type | Documentation source |
+|---------------|--------|---------------------|--------------|----------------------|
+| Not applicable | — | None | None | Delivery Slot is not a [Commerce checkout webhook](https://developer.adobe.com/commerce/extensibility/webhooks/) integration |
+
+#### Webhook configuration summary
+
+- **Dual webhook security (OAuth + signature):** N/A — no synchronous Commerce webhook payload.
+- **Admin actions:** `require-adobe-auth: true` (same as `location-admin`).
+- **Storefront actions:** Invoked from API Mesh with URL in `api-mesh/secrets.yaml`; browsers do not receive admin credentials.
+- **Order booking:** Adobe I/O Events → Runtime action (see Integration points).
+
+### Integration points
+
+#### 1. Cart — save selected slot (storefront → Commerce)
+
+| Aspect | Value |
+|--------|-------|
+| **Trigger** | Shopper confirms day/time on cart (EDS) |
+| **API** | GraphQL [`setCustomAttributesOnCart`](https://developer.adobe.com/commerce/webapi/graphql/schema/attributes/mutations/set-custom-cart) |
+| **Attributes** | `delivery_date_time`, `delivery_date_time_slot`, optional `delivery_date_reset` |
+| **Definition** | Register via [OOPE custom attributes](https://developer.adobe.com/commerce/extensibility/oope-modules/custom-attributes) on **Cart** / **Order** (Phase 4 provisioning) |
+| **Copy to order** | Documented behavior: custom cart attributes copy to the order on conversion ([setCustomAttributesOnCart](https://developer.adobe.com/commerce/webapi/graphql/schema/attributes/mutations/set-custom-cart)) |
+
+EDS should call Commerce GraphQL **with the shopper token** for cart mutations. App Builder computes **availability only**; it does not replace Commerce as cart system of record.
+
+#### 2. Storefront — available slots (EDS → API Mesh → App Builder)
+
+| Aspect | Value |
+|--------|-------|
+| **Trigger** | Cart page load, picker open, proceed-to-checkout validation |
+| **Input** | `storeViewCode`, cart line SKUs (or `cartId` + server-side cart read in Phase 4), category ids, optional saved slot for `selectedTimeValid` |
+| **Output** | Path (`regular` \| `special`), days with time rows, flags (`mixedCartBlocked`, messages), `selectedTimeValid` |
+| **Logic port** | Legacy `DeliverySlot` rules: 7-day vs special window, cutoffs (regular only), capacity, path selection |
+
+Catalog inputs for **MVP-C** (**in launch scope — legacy parity**):
+
+- Product attribute **`days_availability`** (comma weekday indexes; empty = all days).
+- Product attribute **`offset_delivery_date`** (Brainvire parity for weekday list + `delivery_date_reset` on cart save).
+- **Mixed cart:** special + regular → blocking message, no selectable dates.
+
+Read via Commerce GraphQL product query in the storefront action (same pattern as `actions/block/lib/attribute-catalog.js`). **OQ-7:** merchandising must confirm attributes on ACCS before go-live; slot-builder implements legacy splice/ intersection rules (no “all days” degrade at launch).
+
+#### 3. Order placed — increment booked count (Commerce → App Builder)
+
+Legacy hook: `sales_model_service_quote_submit_before`. On SaaS, use **App Management eventing** ([Events installation](https://developer.adobe.com/commerce/extensibility/app-management/installation/events)) + **Runtime action** ([Consume events](https://developer.adobe.com/commerce/extensibility/events/consume-events)).
+
+| Decision (OQ-3) | Choice |
+|-----------------|--------|
+| **Primary event** | `observer.checkoutsubmitallafter` — fires after checkout submit; aligns with placed order ([Events reference](https://developer.adobe.com/commerce/extensibility/events/events-reference) → Sales) |
+| **Alternate / supplement** | `plugin.sales.api.ordermanagement.place` if headless place-order path does not emit `checkoutsubmitallafter` in testing — register both only if Phase 4 testing proves one path is missed |
+| **Action** | `delivery-slot-order-book` (non-public; invoked by event registration) |
+| **Steps** | (1) Parse `order_id` / increment id from event payload. (2) Idempotency: document in **`littlefarms_delivery_bookings`** keyed by `orderId` — skip if already booked. (3) Commerce GraphQL (IMS S2S): load order `custom_attributes` for delivery fields. (4) If empty, no-op. (5) Else apply regular vs special rules; atomic increment booked in config document. (6) Invalidate slot State cache. |
+| **Idempotency** | Required — events may redeliver |
+
+Do **not** rely on the browser calling “book” after `placeOrder` as the only mechanism.
+
+#### 4. Post-order reschedule — MVP-D (legacy `LittleFarms_Sales`)
+
+| Surface | Flow |
+|---------|------|
+| **Customer (EDS)** | Order detail → Mesh `deliverySlotOrderSlots(orderId)` → picker → Commerce GraphQL mutation to set **order** custom attributes (Order entity supports custom attributes per [custom attribute mutations overview](https://developer.adobe.com/commerce/webapi/graphql/schema/attributes/mutations/); exact mutation name verified against SaaS schema in Phase 4) |
+| **Admin (CS)** | **Phase 4 choice:** (A) Commerce Admin order UI if OOPE renders editable order custom attributes, or (B) **Little Farms Admin** module screen: lookup by increment id + same slot APIs + order attribute mutation. Legacy used native Admin order view — prefer (A) if ACCS supports it without custom Admin UI SDK order extension; otherwise (B). |
+| **Booked counts** | **No update** on reschedule (legacy parity) |
+
+#### 5. Daily reset — regular path only
+
+| Aspect | Value |
+|--------|-------|
+| **Legacy** | Cron `lf_deliveryslotreset` at ~00:01 store time |
+| **SaaS** | App Builder **alarm trigger** on `delivery-slot-reset` ([Triggers reference](https://developer.adobe.com/app-builder/docs/guides/runtime_guides/reference_docs/triggersrules)) |
+| **Behavior** | Zero **yesterday’s weekday** `booked_count` on regular config rows; special JSON booked unchanged |
+| **Timezone (OQ-4)** | **Commerce store timezone** — resolve via store config for `storeViewCode` inside the action (fallback `Asia/Singapore` only if config missing; log warning) |
+
+### Where it sits in the app
+
+| Field | Value |
+|-------|-------|
+| Admin module id | `delivery-slot-management` |
+| Rail label | **Delivery Slots** |
+| Registry | `src/commerce-backend-ui-2/web-src/src/modules/registry.ts` |
+
+Two admin areas mirror legacy config:
+
+1. **Regular delivery** — weekday grids (Start, End, Max, Booked read-only).
+2. **Special events** — enable, order window, category+offset rows, weekday grids (Booked as date→count summary).
+
+### Component architecture
+
+Single-file actions + `actions/delivery-slot/lib/` (store, slot-builder, booking, cache). Pattern: `actions/location/admin/index.js` operation router + `actions/location/storefront/location/index.js`.
+
+| Action | Path | Caller | Purpose |
+|--------|------|--------|---------|
+| `delivery-slot-admin` | `actions/delivery-slot/admin/index.js` | Admin SPA | `regular-get`, `regular-write`, `special-get`, `special-write` |
+| `delivery-slot-storefront` | `actions/delivery-slot/storefront/index.js` | API Mesh | `slots-for-cart`, `slots-for-order`, `validate-saved-slot` |
+| `delivery-slot-order-book` | `actions/delivery-slot/events/order-book/index.js` | I/O Events | Increment booked; idempotent |
+| `delivery-slot-reset` | `actions/delivery-slot/jobs/reset/index.js` | Alarm trigger | Regular weekday booked reset |
+
+Register in `src/commerce-backend-ui-2/ext.config.yaml` (and alarm + event targets in `app.config.yaml` / `app.commerce.config.ts` when eventing is added).
+
+| Action | Auth | Timeout | Memory |
+|--------|------|---------|--------|
+| `delivery-slot-admin` | `require-adobe-auth: true`, `include-ims-credentials: true` | 20000 ms | 512 MB |
+| `delivery-slot-storefront` | Mesh server call; `final: true`; IMS for catalog reads | 20000 ms | 1024 MB |
+| `delivery-slot-order-book` | Event invocation only | 30000 ms | 256 MB |
+| `delivery-slot-reset` | Alarm / internal | 60000 ms | 256 MB |
+
+### Data model (Database)
+
+Scoped by `environmentId` + `storeViewCode` (use existing `app-scope.js` patterns from Blocks/Locations).
+
+**Collection `littlefarms_delivery_regular`** — one document per store view:
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `storeViewCode` | string | Scope key |
+| `weekdays` | object | Keys `sunday`…`saturday` → array of `{ startTime, endTime, maxUser, bookedCount }` |
+| `updatedAt` | string | ISO |
+
+**Collection `littlefarms_delivery_special`** — one document per store view:
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `enabled` | boolean | |
+| `orderStartDate`, `orderEndDate` | string | `Y-m-d` |
+| `categoryOffsets` | array | `{ categoryId, offsetDays }` |
+| `weekdays` | object | Same row shape; `bookedCount` stored as object map **date → count** per row (normalized in lib) |
+| `updatedAt` | string | ISO |
+
+**Collection `littlefarms_delivery_bookings`** — idempotency for event consumer:
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `orderId` | string | Commerce order entity id |
+| `incrementId` | string | Optional display |
+| `bookedAt` | string | ISO |
+| `path` | string | `regular` \| `special` |
+
+Greenfield launch: all `bookedCount` start at **0** / `{}`.
+
+### Slot builder (shared lib)
+
+Central module `actions/delivery-slot/lib/slot-builder.js`:
+
+1. Resolve **regular vs special** from special config + cart categories.
+2. Build date list (7-day vs offset window).
+3. For each candidate slot row, apply **capacity** (`maxUser - booked > 0`).
+4. Apply **cutoffs** for regular path only (store local time) — port constants from legacy `LittleFarms/Checkout/Model/DeliverySlot.php`: `MORNING_SLOT` **12:00**, `EVENING_SLOT` **19:30**, morning starts **11:00–15:00** (repo: `littlefarms2024`).
+5. Apply **days_availability** intersection across cart products (MVP-C).
+6. Apply **offset_delivery_date** weekday splice (MVP-C).
+7. Detect **mixed cart** → block with message.
+
+Unit-testable pure functions where possible (Phase 4).
+
+### Caching (State)
+
+| Key pattern | TTL | Invalidate on |
+|-------------|-----|----------------|
+| `delivery.slots.{storeViewCode}.{cartHash}` | 60–120 s (TBD Phase 4) | Admin write, book, reset |
+
+Short TTL because capacity changes on each order.
+
+### API Mesh (storefront contract sketch)
+
+Add to `api-mesh/schema.graphql` (names illustrative; finalize in `docs/delivery-slot-storefront-contract.md`):
+
+| Query / field | Maps to |
+|---------------|---------|
+| `littleFarmsDeliverySlots(cartId, storeViewCode, …)` | `slots-for-cart` |
+| `littleFarmsDeliverySlotValidate(...)` | `validate-saved-slot` |
+| `littleFarmsDeliveryOrderSlots(orderId, storeViewCode)` | `slots-for-order` (MVP-D) |
+
+Secrets: `LITTLEFARMS_DELIVERY_SLOT_STOREFRONT_URL` → `delivery-slot-storefront` (mirror Locations).
+
+**Not in Mesh:** `setCustomAttributesOnCart` / order mutations — EDS → Commerce GraphQL with customer/admin token.
+
+### End-to-end flows
+
+```mermaid
+sequenceDiagram
+  participant EDS as EDS storefront
+  participant Mesh as API Mesh
+  participant AB as delivery-slot-storefront
+  participant COM as Commerce GraphQL
+  participant EVT as I/O Events
+  participant BK as delivery-slot-order-book
+
+  EDS->>Mesh: littleFarmsDeliverySlots
+  Mesh->>AB: slots-for-cart
+  AB->>COM: products attributes optional
+  AB-->>EDS: days and times
+
+  EDS->>COM: setCustomAttributesOnCart
+  EDS->>COM: checkout / placeOrder
+  COM->>EVT: checkoutsubmitallafter
+  EVT->>BK: order payload
+  BK->>COM: get order custom attributes
+  BK->>BK: increment booked idempotent
+```
+
+### Checkout gate
+
+| Layer | Responsibility |
+|-------|------------------|
+| **EDS** | Proceed-to-checkout blocked if no slot or `selectedTimeValid = 0`; mixed-cart message |
+| **Optional** | Mesh `validate-saved-slot` before navigation (server-side mirror of client rules) |
+
+No Commerce PHP `predispatch` observer on SaaS — gate is **storefront-first** with validation action for consistency.
+
+### Security
+
+| Surface | Control |
+|---------|---------|
+| Admin config | IMS + `require-adobe-auth` |
+| Storefront slot read | Public catalog-like data; rate-limit via Mesh; no PII in slot requests (SKUs/categories only) |
+| Order book consumer | Event registration only; not a public web action |
+| Order reschedule | Customer token + order ownership; admin IMS for CS path |
+
+### MVP-C (decided)
+
+**Product decision (2026-10-27):** **MVP-C ships at launch** with legacy behavior — `days_availability` intersection, `offset_delivery_date` weekday splice, mixed-cart block, and `delivery_date_reset` when offset products are in the cart. Implemented in the same `slot-builder` as MVP-A/B.
+
+### Architecture decisions
+
+| ID | Decision |
+|----|----------|
+| AD-DS1 | No checkout webhooks; cart custom attributes + events for booking |
+| AD-DS2 | Book on **`observer.checkoutsubmitallafter`** with idempotent store |
+| AD-DS3 | Timezone from Commerce store config (OQ-4) |
+| AD-DS4 | Greenfield booked counts (OQ-5) |
+| AD-DS5 | MVP-D: order attribute update without booked adjustment (OQ-6) |
+| AD-DS6 | EDS owns cart/order GraphQL mutations; App Builder owns config + slot math + booking |
+
+### Testing
+
+Recommendations only: cutoff boundaries, special window edges, capacity 0, idempotent double event, reset job, mixed cart, reschedule without booked change. Vitest on `slot-builder` if requested.
+
+### Approvals
+
+| Role | Name | Date |
+|------|------|------|
+| Architect | Solutions Architect Agent | 2026-10-27 |
+| Product / Tech Lead | User approval | 2026-10-27 |
+
+### Change log
+
+| Version | Date | Description |
+|---------|------|-------------|
+| 0.1 | 2026-10-27 | Initial Delivery Slot architecture draft |
+| 0.2 | 2026-10-27 | Launch scope includes MVP-C (legacy product rules) |
+| 0.3 | 2026-10-27 | Approved by user |

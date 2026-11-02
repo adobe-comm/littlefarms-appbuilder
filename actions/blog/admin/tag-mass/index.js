@@ -2,6 +2,7 @@ const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
 const { createTagStore } = require('../../lib/taxonomy-store')
 const { withBlogEnvironmentParams } = require('../../lib/blog-scope')
+const { invalidateBlogStorefrontCache } = require('../../lib/invalidate-blog-storefront-cache')
 
 async function main (params) {
   const logger = Core.Logger('blog-tag-mass', { level: params.LOG_LEVEL || 'info' })
@@ -12,6 +13,7 @@ async function main (params) {
     if (operation !== 'delete') throw new Error('Unknown mass action.')
     const store = createTagStore(params)
     const result = await store.remove(params.ids)
+    if (result.affected > 0) await invalidateBlogStorefrontCache(params)
     logger.info(`Blog tag mass delete affected ${result.affected}`)
     return { statusCode: 200, body: { operation, affected: result.affected } }
   } catch (error) {

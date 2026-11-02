@@ -27,6 +27,8 @@ runtimeManifest:
             LOG_LEVEL: $LOG_LEVEL
             DB_REGION: $DB_REGION
             STATE_REGION: $STATE_REGION
+            STOREFRONT_CACHE_FRESH_SECONDS: $STOREFRONT_CACHE_FRESH_SECONDS
+            STOREFRONT_CACHE_SWR_SECONDS: $STOREFRONT_CACHE_SWR_SECONDS
             PRESET_RESULT_CACHE_TTL: $PRESET_RESULT_CACHE_TTL
             EVALUATE_SHARED_SECRET: $EVALUATE_SHARED_SECRET
             EVAL_CACHE_TTL: $EVAL_CACHE_TTL
@@ -44,7 +46,7 @@ runtimeManifest:
             IMS_SCOPES: $IMS_SCOPES
           limits:
             timeout: 30000
-            memorySize: 512
+            memorySize: 1024
           annotations:
             final: true
             include-ims-credentials: true
@@ -56,7 +58,7 @@ runtimeManifest:
             <<: *block-storefront-inputs
           limits:
             timeout: 15000
-            memorySize: 256
+            memorySize: 1024
           annotations:
             final: true
             include-ims-credentials: true
@@ -70,6 +72,7 @@ runtimeManifest:
             STATE_REGION: $STATE_REGION
             PRESET_RESULT_CACHE_TTL: $PRESET_RESULT_CACHE_TTL
             COMMERCE_CORE_GRAPHQL_URL: $COMMERCE_CORE_GRAPHQL_URL
+            COMMERCE_CORE_REST_URL: $COMMERCE_CORE_REST_URL
             MAGENTO_STORE_CODE: $MAGENTO_STORE_CODE
             MAGENTO_WEBSITE_CODE: $MAGENTO_WEBSITE_CODE
             MAGENTO_ENVIRONMENT_ID: $MAGENTO_ENVIRONMENT_ID
@@ -81,7 +84,7 @@ runtimeManifest:
             IMS_SCOPES: $IMS_SCOPES
           limits: &admin-limits
             timeout: 60000
-            memorySize: 512
+            memorySize: 1024
           annotations: &admin-annotations
             require-adobe-auth: true
             final: true
@@ -113,6 +116,8 @@ runtimeManifest:
           runtime: nodejs:22
           inputs: &blog-inputs
             <<: *admin-inputs
+            STOREFRONT_CACHE_FRESH_SECONDS: $STOREFRONT_CACHE_FRESH_SECONDS
+            STOREFRONT_CACHE_SWR_SECONDS: $STOREFRONT_CACHE_SWR_SECONDS
             AIO_COMMERCE_CONFIG_ENCRYPTION_KEY: $AIO_COMMERCE_CONFIG_ENCRYPTION_KEY
           limits:
             <<: *admin-limits
@@ -126,7 +131,7 @@ runtimeManifest:
             <<: *blog-inputs
           limits:
             timeout: 20000
-            memorySize: 512
+            memorySize: 1024
           annotations:
             final: true
             include-ims-credentials: true
@@ -136,9 +141,11 @@ runtimeManifest:
           runtime: nodejs:22
           inputs:
             <<: *admin-inputs
+            STOREFRONT_CACHE_FRESH_SECONDS: $STOREFRONT_CACHE_FRESH_SECONDS
+            STOREFRONT_CACHE_SWR_SECONDS: $STOREFRONT_CACHE_SWR_SECONDS
           limits:
             timeout: 15000
-            memorySize: 512
+            memorySize: 1024
           annotations:
             final: true
             include-ims-credentials: true
@@ -148,12 +155,14 @@ runtimeManifest:
           runtime: nodejs:22
           inputs:
             <<: *admin-inputs
+            STOREFRONT_CACHE_FRESH_SECONDS: $STOREFRONT_CACHE_FRESH_SECONDS
+            STOREFRONT_CACHE_SWR_SECONDS: $STOREFRONT_CACHE_SWR_SECONDS
             PRESET_RESULT_CACHE_TTL: $PRESET_RESULT_CACHE_TTL
             COMMERCE_CORE_GRAPHQL_URL: $COMMERCE_CORE_GRAPHQL_URL
             MAGENTO_ENVIRONMENT_ID: $MAGENTO_ENVIRONMENT_ID
           limits:
             timeout: 15000
-            memorySize: 512
+            memorySize: 1024
           annotations:
             final: true
             include-ims-credentials: true
@@ -165,7 +174,7 @@ runtimeManifest:
             <<: *admin-inputs
           limits:
             timeout: 60000
-            memorySize: 512
+            memorySize: 1024
           annotations:
             <<: *admin-annotations
         process-data:
@@ -176,7 +185,7 @@ runtimeManifest:
             <<: *admin-inputs
           limits:
             timeout: 1800000
-            memorySize: 512
+            memorySize: 1024
           annotations:
             final: true
             include-ims-credentials: true
@@ -198,7 +207,56 @@ runtimeManifest:
             IMS_SCOPES: $IMS_SCOPES
           limits:
             timeout: 60000
+            memorySize: 1024
+          annotations:
+            final: true
+            include-ims-credentials: true
+        delivery-slot-admin:
+          function: ../../actions/delivery-slot/admin/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 20000
             memorySize: 512
+          annotations:
+            <<: *admin-annotations
+        delivery-slot-storefront:
+          function: ../../actions/delivery-slot/storefront/index.js
+          web: yes
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+            STOREFRONT_CACHE_FRESH_SECONDS: $STOREFRONT_CACHE_FRESH_SECONDS
+            STOREFRONT_CACHE_SWR_SECONDS: $STOREFRONT_CACHE_SWR_SECONDS
+          limits:
+            timeout: 20000
+            memorySize: 1024
+          annotations:
+            final: true
+            include-ims-credentials: true
+        delivery-slot-order-book:
+          function: ../../actions/delivery-slot/events/order-book/index.js
+          web: 'no'
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 30000
+            memorySize: 256
+          annotations:
+            final: true
+            include-ims-credentials: true
+        delivery-slot-reset:
+          function: ../../actions/delivery-slot/jobs/reset/index.js
+          web: 'no'
+          runtime: nodejs:22
+          inputs:
+            <<: *admin-inputs
+          limits:
+            timeout: 60000
+            memorySize: 256
           annotations:
             final: true
             include-ims-credentials: true
@@ -208,21 +266,15 @@ runtimeManifest:
           inputs:
             minutes: 43200
             trigger_payload: '{"scheduled":true}'
-        storefront-warm:
+        delivery-slot-reset-daily:
           feed: /whisk.system/alarms/interval
           inputs:
-            minutes: 1
-            trigger_payload: '{"warm":true}'
+            minutes: 1440
+            trigger_payload: '{"scheduled":true,"job":"delivery-slot-reset"}'
       rules:
         attribute-sync-monthly-rule:
           trigger: attribute-sync-monthly
           action: attribute-sync
-        storefront-warm-blocks:
-          trigger: storefront-warm
-          action: block-storefront
-        storefront-warm-brands:
-          trigger: storefront-warm
-          action: brand-storefront
-        storefront-warm-locations:
-          trigger: storefront-warm
-          action: location-storefront
+        delivery-slot-reset-daily-rule:
+          trigger: delivery-slot-reset-daily
+          action: delivery-slot-reset

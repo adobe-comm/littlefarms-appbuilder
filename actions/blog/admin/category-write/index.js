@@ -2,6 +2,7 @@ const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
 const { createCategoryStore } = require('../../lib/taxonomy-store')
 const { withBlogEnvironmentParams } = require('../../lib/blog-scope')
+const { invalidateBlogStorefrontCache } = require('../../lib/invalidate-blog-storefront-cache')
 
 async function main (params) {
   const logger = Core.Logger('blog-category-write', { level: params.LOG_LEVEL || 'info' })
@@ -11,6 +12,7 @@ async function main (params) {
     const fields = params.fields && typeof params.fields === 'object' ? params.fields : {}
     const store = createCategoryStore(params)
     const category = await store.save(fields, params.categoryId)
+    await invalidateBlogStorefrontCache(params)
     logger.info(`Saved blog category ${category.categoryId}`)
     return { statusCode: 200, body: { category } }
   } catch (error) {

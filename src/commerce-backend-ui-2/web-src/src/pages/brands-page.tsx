@@ -333,7 +333,7 @@ export function BrandsPage({ ims }: { ims: Ims }) {
               <span className="admin-record-count">{total} records found</span>
               <div className="admin-pager">
                 <label>
-                  <select value={PAGE_SIZE} disabled aria-label="Records per page">
+                  <select className="admin-split-select" value={PAGE_SIZE} disabled aria-label="Records per page">
                     <option value={PAGE_SIZE}>{PAGE_SIZE}</option>
                   </select>
                   <span>per page</span>
@@ -372,7 +372,7 @@ export function BrandsPage({ ims }: { ims: Ims }) {
                   ) : null}
                   {items.map(item => (
                     <tr key={item.optionValue}>
-                      <td>{item.optionLabel}</td>
+                      <td className="admin-grid-cell-title">{item.optionLabel}</td>
                       <td>{item.attributeCode}</td>
                       <td>{item.image ? <img className="brand-thumb" src={item.image} alt={item.image_alt || ""} /> : "No image"}</td>
                       <td>{item.show_in_brand_slider_widget ? "Yes" : "No"}</td>
