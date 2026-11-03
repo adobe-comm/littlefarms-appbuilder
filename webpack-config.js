@@ -1,10 +1,13 @@
 module.exports = () => {
   const isDev = process.env.NODE_ENV === 'development'
+  const prod = !isDev
 
   return {
+    mode: prod ? 'production' : 'development',
     devtool: isDev ? 'inline-source-map' : false,
     optimization: {
-      minimize: !isDev
+      minimize: prod,
+      usedExports: prod
     },
     module: {
       rules: [
@@ -15,9 +18,6 @@ module.exports = () => {
           use: 'ts-loader'
         }
       ]
-    },
-    output: {
-      filename: 'bundle.js'
     }
   }
 }
