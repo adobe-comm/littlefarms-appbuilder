@@ -35,7 +35,7 @@ function legacyLocationMediaUrl (relativePath, mediaBase = DEFAULT_LOCATION_MEDI
   const name = trimmed(relativePath)
   if (!name) return ''
   if (isAbsoluteUrl(name)) return name
-  const base = trimmed(mediaBase).replace(/\/+$/, '')
+  const base = trimmed(mediaBase || DEFAULT_LOCATION_MEDIA_BASE).replace(/\/+$/, '')
   const segment = name.split('/').map(part => encodeURIComponent(part)).join('/')
   return `${base}/${segment}`
 }
@@ -62,7 +62,7 @@ function legacyTeamProfileMediaUrl (filename, mediaBase = DEFAULT_LOCATION_MEDIA
   const name = trimmed(filename)
   if (!name) return ''
   if (isAbsoluteUrl(name)) return name.replace(/\/\/media\//, '/media/')
-  const base = trimmed(mediaBase).replace(/\/+$/, '')
+  const base = trimmed(mediaBase || DEFAULT_LOCATION_MEDIA_BASE).replace(/\/+$/, '')
   const segment = name.split('/').map(part => encodeURIComponent(part)).join('/')
   return `${base}/profile/${segment}`
 }

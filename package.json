@@ -21,7 +21,8 @@
     "node-fetch": "^2.6.0",
     "openwhisk": "^3.21.9",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^6.30.6"
   },
   "devDependencies": {
     "@adobe-commerce/commerce-extensibility-tools": "^3.5.0",
@@ -39,7 +40,8 @@
     "lint:fix": "npm run lint -- --fix",
     "start": "NODE_ENV=development BABEL_ENV=development aio app run -e commerce/backend-ui/2",
     "dev": "NODE_ENV=development BABEL_ENV=development aio app dev -e commerce/backend-ui/2",
-    "deploy": "aio app deploy",
+    "build": "NODE_ENV=production BABEL_ENV=production aio app build",
+    "deploy": "npm run build && aio app deploy",
     "collection-list": "aio app db collection list",
     "update-mesh": "cd api-mesh && aio api-mesh update meshConfig.json -s secrets.yaml"
   },

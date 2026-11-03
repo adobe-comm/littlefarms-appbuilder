@@ -267,7 +267,7 @@ export function LocationStoresPage({ ims }: { ims: Ims }) {
   return (
     <main className="conditional-blocks admin-list locations-page">
       <header className="admin-list-header">
-        <h1>Stores</h1>
+        <h1>Locations</h1>
       </header>
       <div className="admin-list-band">
         <button type="button" className="admin-primary" onClick={() => setFormIntent("create")}>
@@ -414,7 +414,7 @@ export function LocationStoresPage({ ims }: { ims: Ims }) {
                 setPage(1);
               }}
             >
-              <div className="admin-filter-col">
+              <div className="admin-filter-col admin-filter-col-id">
                 <span className="admin-filter-name">ID</span>
                 <label>
                   from
@@ -578,6 +578,7 @@ export function LocationStoresPage({ ims }: { ims: Ims }) {
             <div className="admin-pager">
               <label>
                 <select
+                  className="admin-split-select"
                   value={pageSize}
                   aria-label="Records per page"
                   onChange={event => {
@@ -678,7 +679,7 @@ export function LocationStoresPage({ ims }: { ims: Ims }) {
                       </td>
                     ) : null}
                     {visibleColumns.id ? <td>{item.locationId}</td> : null}
-                    {visibleColumns.title ? <td>{item.title}</td> : null}
+                    {visibleColumns.title ? <td className="admin-grid-cell-title">{item.title}</td> : null}
                     {visibleColumns.storeView ? <td>{item.storeViewLabel}</td> : null}
                     {visibleColumns.country ? <td>{countryName(item.country)}</td> : null}
                     {visibleColumns.city ? <td>{item.city}</td> : null}

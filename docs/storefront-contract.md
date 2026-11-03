@@ -6,8 +6,8 @@ Headless consumers (EDS, API Mesh, storefront servers) must **not** use Admin IM
 
 | Action | Auth |
 |--------|------|
-| **`block-storefront`** (list / get presets) | **Public** — no secret; only **enabled** presets are returned. A 1-minute alarm sends `warm: true`. The action returns `{ "message": "action is live" }` and does not open the database |
-| **`location-storefront`** (list / get locations) | **Public** — no secret; only **enabled** locations are returned. Same warm alarm as blocks/brands |
+| **`block-storefront`** (list / get presets) | **Public** — no secret; only **enabled** presets are returned |
+| **`location-storefront`** (list / get locations) | **Public** — no secret; only **enabled** locations are returned |
 | **`block-evaluate`** (PDP placement) | **`x-conditional-block-secret`** = App Builder `EVALUATE_SHARED_SECRET` |
 
 Browsers should call **API Mesh GraphQL**, not App Builder URLs directly. Mesh holds the evaluate secret for placement queries only ([`../api-mesh/`](../api-mesh/)).
@@ -306,6 +306,8 @@ GraphQL: `littleFarmsBlogPosts`, `littleFarmsBlogPostsByCategory`, `littleFarmsB
 | `record-visit` | Increment `view_count` for a published post (`postId` or `urlKey`). |
 
 List responses: `{ "page", "pageSize", "total", "pageCount", "items": [ … ] }`. Only **published** posts within publish/end window are returned. Customer group restrictions apply when `customerGroupId` is sent.
+
+**Storefront cache (State SWR):** All storefront actions (`block-storefront`, `brand-storefront`, `location-storefront`, `blog-storefront`) use shared env **`STOREFRONT_CACHE_FRESH_SECONDS`** (default 60) and **`STOREFRONT_CACHE_SWR_SECONDS`** (default 3600). Read responses are stored in App Builder State; after the fresh window, stale payloads are served while State revalidates in the background. Admin saves, cache flush, migration, and Settings **flush storefront cache** clear the matching `*.storefront.*` keys. Blog `record-visit` is not cached. **`PRESET_RESULT_CACHE_TTL`** still applies to inner block SKU / brand entity caches during enrichment.
 
 Example:
 

@@ -1,0 +1,214 @@
+/**
+ * Commerce Admin menu — CSS grid rows; borders match Commerce / mockup.
+ */
+.lf-app-main .lf-module-launcher {
+  --lf-launcher-heading-h: 35px;
+  --lf-launcher-link-h: 37px;
+  --lf-launcher-col-gap: 12px;
+  --lf-launcher-row-gap: 12px;
+  --lf-launcher-col-w: 236px;
+  --lf-launcher-border: #e1e1e1;
+  --lf-launcher-divider: #e8e8e8;
+  --lf-launcher-header-bg: #f5f5f5;
+  --lf-launcher-inset-x: 12px;
+
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: #fff;
+  color: #222;
+  font-family: var(--paas-font-family, "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif);
+  font-size: 14px;
+}
+
+.lf-app-main .lf-module-launcher-header {
+  flex-shrink: 0;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--lf-launcher-divider);
+  background: #fff;
+}
+
+.lf-app-main .lf-module-launcher-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: #41362f;
+}
+
+.lf-app-main .lf-module-launcher-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: #f5f5f5;
+}
+
+.lf-app-main .lf-module-launcher-grid {
+  display: grid;
+  grid-template-columns: var(--lf-launcher-col-w) var(--lf-launcher-col-w);
+  grid-template-areas:
+    "store brand"
+    "blogs content"
+    "system system";
+  column-gap: var(--lf-launcher-col-gap);
+  row-gap: var(--lf-launcher-row-gap);
+  align-items: start;
+  width: fit-content;
+  max-width: 100%;
+  padding: 16px 20px 28px;
+  box-sizing: border-box;
+}
+
+.lf-app-main .lf-module-launcher-card--store {
+  grid-area: store;
+}
+
+.lf-app-main .lf-module-launcher-card--brand {
+  grid-area: brand;
+}
+
+.lf-app-main .lf-module-launcher-card--blogs {
+  grid-area: blogs;
+}
+
+.lf-app-main .lf-module-launcher-card--content {
+  grid-area: content;
+}
+
+.lf-app-main .lf-module-launcher-card--system {
+  grid-area: system;
+}
+
+.lf-app-main .lf-module-launcher-card {
+  background: #fff;
+  border: 1px solid var(--lf-launcher-border);
+  border-radius: 1px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.lf-app-main .lf-module-launcher-group {
+  margin: 0;
+}
+
+.lf-app-main .lf-module-launcher-group-heading {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 var(--lf-launcher-inset-x);
+  height: var(--lf-launcher-heading-h);
+  border-bottom: 1px solid var(--lf-launcher-divider);
+  background: var(--lf-launcher-header-bg);
+  box-sizing: border-box;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #303030;
+}
+
+.lf-app-main .lf-module-launcher-group-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lf-app-main .lf-module-launcher-group-list li {
+  position: relative;
+}
+
+/* Inset row dividers (not edge-to-edge), including after last item */
+.lf-app-main .lf-module-launcher-group-list li::after {
+  content: "";
+  position: absolute;
+  left: var(--lf-launcher-inset-x);
+  right: var(--lf-launcher-inset-x);
+  bottom: 0;
+  height: 0;
+  border-bottom: 1px solid var(--lf-launcher-divider);
+  pointer-events: none;
+}
+
+.lf-app-main .lf-module-launcher-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--lf-launcher-link-h);
+  margin: 0;
+  padding: 0 var(--lf-launcher-inset-x);
+  border: none;
+  background: #fff;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 19px;
+  color: #222;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.lf-app-main .lf-module-launcher-link-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.lf-app-main .lf-module-launcher-link-chevron {
+  flex-shrink: 0;
+  color: #b0b0b0;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.lf-app-main .lf-module-launcher-link-chevron::before {
+  content: "›";
+}
+
+.lf-app-main .lf-module-launcher-link:hover,
+.lf-app-main .lf-module-launcher-link:focus-visible {
+  background: #fafafa;
+  outline: none;
+}
+
+html:not(.lf-embed) .lf-app-main .lf-module-launcher-header,
+html:not(.lf-embed) .lf-app-main .lf-module-launcher-grid {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+html.lf-embed .lf-app-main .lf-module-launcher-header,
+html.lf-embed .lf-app-main .lf-module-launcher-grid {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+html.lf-embed .lf-app-main .lf-module-launcher-body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html.lf-embed .lf-app-main .lf-module-launcher-body::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .lf-app-main .lf-module-launcher-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "store"
+      "brand"
+      "blogs"
+      "content"
+      "system";
+    width: 100%;
+  }
+}

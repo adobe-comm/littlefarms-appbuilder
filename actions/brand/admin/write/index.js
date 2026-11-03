@@ -3,6 +3,7 @@ const { errorResponse } = require('../../../utils')
 const { ALL_STORE_VIEWS } = require('../../lib/constants')
 const { createBrandStore, storefrontBrand } = require('../../lib/brand-store')
 const { createBrandCache } = require('../../lib/brand-cache')
+const { invalidateStorefrontSwrCache } = require('../../../lib/storefront-swr-cache')
 
 function useDefaultFields (value) {
   if (Array.isArray(value)) return value.map(field => String(field))
@@ -29,6 +30,7 @@ async function main (params) {
     })
     const cache = await createBrandCache(params)
     await cache.invalidateAll()
+    await invalidateStorefrontSwrCache(params, 'brand')
     logger.info(`Saved brand ${attributeCode}:${optionValue}`)
     return {
       statusCode: 200,

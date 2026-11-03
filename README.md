@@ -15,10 +15,11 @@ Use `node -v` to confirm your version before running Adobe I/O CLI commands.
 
 ## Local Dev
 
-- `aio app run` to start your local Dev server
+- `npm run dev` — development (`aio app dev`): local UI and actions, hot reload
+- `npm start` — production mode (`aio app run`): production build settings; UI local, actions on Runtime by default
 - App will run on `localhost:9080` by default
 
-By default the UI will be served locally but actions will be deployed and served from Adobe I/O Runtime. To run your actions locally use the `aio app dev` option.
+By default `npm start` serves the UI locally but actions are deployed and served from Adobe I/O Runtime. Use `npm run dev` to run actions locally as well.
 
 For more information on the difference between `aio app run` and `aio app dev`, see [here](https://developer.adobe.com/app-builder/docs/guides/development/#aio-app-dev-vs-aio-app-run)
 

@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { LocationSectionNav } from "../components/location-section-nav.tsx";
+import { useEffect, useState } from "react";
 import { LocationContentListPage } from "./location-content-list-page.tsx";
 import type { LocationSectionId } from "./location-section-types.ts";
 import { LocationStoresPage } from "./locations-page.tsx";
@@ -11,12 +10,23 @@ type Ims = {
   imsOrgId: string;
 };
 
-export function LocationsPage({ ims }: { ims: Ims }) {
-  const [activeSection, setActiveSection] = useState<LocationSectionId>("stores");
+export function LocationsPage({
+  ims,
+  initialSection,
+}: {
+  ims: Ims;
+  initialSection?: LocationSectionId;
+}) {
+  const [activeSection, setActiveSection] = useState<LocationSectionId>(initialSection ?? "stores");
+
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection]);
 
   return (
     <div className="lf-location-module">
-      <LocationSectionNav activeSection={activeSection} onSectionChange={setActiveSection} />
       {activeSection === "stores" ? <LocationStoresPage ims={ims} /> : null}
       {activeSection === "services" ? <LocationContentListPage ims={ims} kind="service" /> : null}
       {activeSection === "galleries" ? <LocationContentListPage ims={ims} kind="gallery" /> : null}
@@ -24,3 +34,5 @@ export function LocationsPage({ ims }: { ims: Ims }) {
     </div>
   );
 }
+
+export type { LocationSectionId } from "./location-section-types.ts";

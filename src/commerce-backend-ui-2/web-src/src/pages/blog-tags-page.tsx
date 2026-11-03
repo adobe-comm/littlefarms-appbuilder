@@ -215,6 +215,7 @@ export function BlogTagsPage({ ims }: BlogTagsPageProps) {
             <div className="admin-pager">
               <label>
                 <select
+                  className="admin-split-select"
                   value={pageSize}
                   aria-label="Records per page"
                   onChange={event => {
@@ -285,7 +286,7 @@ export function BlogTagsPage({ ims }: BlogTagsPageProps) {
                       />
                     </td>
                     <td>{item.tagId}</td>
-                    <td>{item.title}</td>
+                    <td className="admin-grid-cell-title">{item.title}</td>
                     <td>{item.url_key || "—"}</td>
                     <td>{item.usedInPosts}</td>
                     <td>{item.createdAt ? new Date(item.createdAt).toLocaleString() : "—"}</td>

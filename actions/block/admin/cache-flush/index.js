@@ -2,6 +2,7 @@ const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../../../utils')
 const { createPresetResultCache } = require('../../lib/preset-result-cache')
 const { createEvalCache } = require('../../lib/eval-cache')
+const { invalidateStorefrontSwrCache } = require('../../../lib/storefront-swr-cache')
 
 async function main (params) {
   const logger = Core.Logger('block-cache-flush', { level: params.LOG_LEVEL || 'info' })
@@ -14,12 +15,14 @@ async function main (params) {
     if (blockId) {
       await presetCache.invalidate(blockId)
       await presetCache.invalidateLists()
+      await invalidateStorefrontSwrCache(params, 'block')
       logger.info(`Flushed preset result cache for block ${blockId}`)
       return { statusCode: 200, body: { flushed: true, scope: 'block', id: blockId } }
     }
 
     await presetCache.invalidateAll()
     await evalCache.invalidate('*')
+    await invalidateStorefrontSwrCache(params, 'block')
     logger.info('Flushed all preset result and PDP evaluation caches')
     return { statusCode: 200, body: { flushed: true, scope: 'all' } }
   } catch (error) {

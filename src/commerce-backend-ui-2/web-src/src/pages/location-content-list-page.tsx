@@ -236,6 +236,7 @@ export function LocationContentListPage({
             <div className="admin-pager">
               <label>
                 <select
+                  className="admin-split-select"
                   value={pageSize}
                   aria-label="Records per page"
                   onChange={event => {
@@ -318,7 +319,7 @@ export function LocationContentListPage({
                           {thumb ? <img className="brand-thumb" src={thumb} alt="" /> : null}
                         </td>
                       ) : null}
-                      <td>{itemLabel(kind, item)}</td>
+                      <td className="admin-grid-cell-title">{itemLabel(kind, item)}</td>
                       {kind === "team" ? <td>{(item as TeamListItem).sortOrder}</td> : null}
                       <td>{statusLabel(item.status)}</td>
                       <td>{item.createdAt || "—"}</td>

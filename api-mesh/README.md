@@ -143,17 +143,15 @@ query {
 
 `meshConfig.responseConfig.cache` is `true`, and the mesh response sets:
 
-`Cache-Control: public, max-age=60, stale-while-revalidate=60, stale-if-error=300`
+`Cache-Control: public, max-age=60`
 
 ([Caching](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/), [cache-control headers](https://developer.adobe.com/graphql-mesh-gateway/mesh/advanced/caching/cache-control-headers/)).
 
 | Directive | Value | Role |
 |-----------|-------|------|
-| `max-age` | **60** | Fresh cache for 1 minute (was 300). Shorter fresh window so Mesh revalidates sooner while App Builder State still holds block/SKU data. |
-| `stale-while-revalidate` | **60** | After `max-age`, Mesh may return stale GraphQL for up to 1 minute while revalidating (confirm behavior in stage with `Cache-Status` / timing). |
-| `stale-if-error` | **300** | On upstream/resolver errors, serve stale cache for up to 5 minutes when available. |
+| `max-age` | **60** | Mesh serves the same GraphQL request from cache for 60 seconds without calling App Builder. After expiry, the next request runs the full resolver again. |
 
-If homepage still feels slow right after the fresh minute expires, raise `stale-while-revalidate` (for example `300`) before raising `max-age` again.
+API Mesh does not apply browser-style `stale-while-revalidate` or `stale-if-error` on cached GraphQL responses; longer-lived stale serving is handled in **App Builder State** (storefront actions), not at the mesh layer. To extend perceived freshness after the mesh TTL, raise `max-age` carefully (content staleness vs latency), or rely on App Builder cache on the miss path.
 
 The cache key is the whole GraphQL request, so a different `blockId` or different arguments is a different entry. There is no per-query or per-id setting.
 

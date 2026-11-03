@@ -160,6 +160,7 @@ export function BlogPostsPage({ ims, onNavigateSection }: BlogPostsPageProps) {
             <div className="admin-pager">
               <label>
                 <select
+                  className="admin-split-select"
                   value={pageSize}
                   aria-label="Records per page"
                   onChange={event => {
@@ -207,7 +208,7 @@ export function BlogPostsPage({ ims, onNavigateSection }: BlogPostsPageProps) {
                 ) : null}
                 {items.map(item => (
                   <tr key={item.postId}>
-                    <td>{item.title}</td>
+                    <td className="admin-grid-cell-title">{item.title}</td>
                     <td>{item.url_key}</td>
                     <td className={item.status === "published" ? "admin-status-published" : "admin-status-draft"}>
                       {item.status === "published" ? "Published" : "Draft"}

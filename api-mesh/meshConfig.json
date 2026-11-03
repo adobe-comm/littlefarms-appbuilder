@@ -38,7 +38,7 @@
         },
         "responseConfig": {
           "cache": {
-            "cacheControl": "public, max-age=60, stale-while-revalidate=3600, stale-if-error=300"
+            "cacheControl": "public, max-age=60"
           }
         }
       }

@@ -176,6 +176,7 @@ export function BlogCategoriesPage({ ims }: { ims: Ims }) {
             <div className="admin-pager">
               <label>
                 <select
+                  className="admin-split-select"
                   value={pageSize}
                   aria-label="Records per page"
                   onChange={event => {
@@ -258,7 +259,7 @@ export function BlogCategoriesPage({ ims }: { ims: Ims }) {
                       />
                     </td>
                     <td>{item.categoryId}</td>
-                    <td>{item.title}</td>
+                    <td className="admin-grid-cell-title">{item.title}</td>
                     <td>{item.url_key || "—"}</td>
                     <td>{item.meta_title || "—"}</td>
                     <td>{item.meta_keywords || "—"}</td>

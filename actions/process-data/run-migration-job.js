@@ -8,6 +8,8 @@ const { runBrandImport } = require('../../migration/data/import-brand-options')
 const { runBlogImport } = require('../../migration/data/import-blog')
 const { createLocationCache } = require('../location/lib/location-cache')
 const { createBrandCache } = require('../brand/lib/brand-cache')
+const { invalidateStorefrontSwrCache } = require('../lib/storefront-swr-cache')
+const { invalidateBlogStorefrontCache } = require('../blog/lib/invalidate-blog-storefront-cache')
 
 async function loadCsvTexts (files, datasets) {
   const texts = {}
@@ -98,6 +100,7 @@ async function runServiceImport (params, job, jobId, migrationState, logger) {
     try {
       const cache = await createBrandCache(params)
       await cache.invalidateAll()
+      await invalidateStorefrontSwrCache(params, 'brand')
     } catch (error) {
       logger.warn(`Brand cache flush failed: ${error.message}`)
     }
@@ -129,6 +132,7 @@ async function runServiceImport (params, job, jobId, migrationState, logger) {
     try {
       const cache = await createLocationCache(params)
       await cache.invalidateDirectory()
+      await invalidateStorefrontSwrCache(params, 'location')
     } catch (error) {
       logger.warn(`Location cache flush failed: ${error.message}`)
     }
@@ -155,7 +159,13 @@ async function runServiceImport (params, job, jobId, migrationState, logger) {
         summary: { cleanup }
       })
     }
-    return runBlogImport(params, buildBlogImportOptions(job, csvTexts), hooks)
+    const summary = await runBlogImport(params, buildBlogImportOptions(job, csvTexts), hooks)
+    try {
+      await invalidateBlogStorefrontCache(params)
+    } catch (error) {
+      logger.warn(`Blog storefront cache flush failed: ${error.message}`)
+    }
+    return summary
   }
 
   throw new Error(`Migration service "${job.service}" is not implemented.`)

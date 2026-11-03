@@ -1328,7 +1328,7 @@ export function MainPage({ ims }: { ims: { imsToken: string; imsOrgId: string } 
           <span className="admin-record-count">{filteredPresets.length} records found</span>
           <div className="admin-pager">
             <label>
-              <select value={PAGE_SIZE} disabled aria-label="Records per page">
+              <select className="admin-split-select" value={PAGE_SIZE} disabled aria-label="Records per page">
                 <option value={PAGE_SIZE}>{PAGE_SIZE}</option>
               </select>
               <span>per page</span>

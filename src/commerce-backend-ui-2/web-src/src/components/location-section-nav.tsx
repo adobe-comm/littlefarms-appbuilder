@@ -1,7 +1,7 @@
 import type { LocationSectionId } from "../pages/location-section-types.ts";
 
 const sections: { id: LocationSectionId; label: string }[] = [
-  { id: "stores", label: "Stores" },
+  { id: "stores", label: "Locations" },
   { id: "services", label: "Service" },
   { id: "galleries", label: "Gallery" },
   { id: "team", label: "Team Profile" },

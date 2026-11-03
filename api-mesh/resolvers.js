@@ -35,6 +35,131 @@ function secretsFrom (context) {
   return (context && context.secrets) || {}
 }
 
+function mapDeliverySlotDay (day) {
+  day = day || {}
+  return {
+    sort_name: day.sort_name || '',
+    value: day.value || '',
+    day_number: day.day_number || '',
+    is_active: day.is_active === true,
+    time_slot: (day.time_slot || []).map(function (slot) {
+      slot = slot || {}
+      return {
+        start_time: slot.start_time || '',
+        end_time: slot.end_time || '',
+        max_user: slot.max_user || '',
+        booked_count: slot.booked_count || '',
+        remaining: slot.remaining != null ? Number(slot.remaining) : 0
+      }
+    })
+  }
+}
+
+function unwrapDeliverySlotActionPayload (payload) {
+  payload = payload || {}
+  if (payload.body && typeof payload.body === 'object') {
+    var inner = payload.body
+    if (inner.body && typeof inner.body === 'object') {
+      var deep = inner.body
+      if (Array.isArray(deep.daySlot) || deep.path) {
+        return deep
+      }
+    }
+    if (Array.isArray(inner.daySlot) || inner.path) {
+      return inner
+    }
+  }
+  return payload
+}
+
+function mapDeliverySlotsPayload (payload) {
+  payload = unwrapDeliverySlotActionPayload(payload || {})
+  return {
+    path: payload.path || '',
+    date: payload.date || '',
+    selectedDay: payload.selectedDay || '',
+    selectedTime: payload.selectedTime || '',
+    selectedTimeValid: payload.selectedTimeValid != null ? Number(payload.selectedTimeValid) : 0,
+    mixedCartBlocked: payload.mixedCartBlocked === true,
+    message: payload.message || '',
+    offsetDeliveryFlag: payload.offsetDeliveryFlag === true,
+    daySlot: (payload.daySlot || []).map(mapDeliverySlotDay)
+  }
+}
+
+/** App Builder delivery-slot DB keys match admin UI (delivery-slots-page → "default"), not Commerce GraphQL headers. */
+function deliverySlotStoreViewCode (args) {
+  var fromArgs = String(args.storeViewCode || '').trim()
+  return fromArgs || 'default'
+}
+
+function deliverySlotBodyFromArgs (args, operation, secrets) {
+  var skus = (args.skus || []).map(function (sku) { return String(sku || '').trim() }).filter(Boolean)
+  if (!skus.length) {
+    throw new Error('At least one sku is required for delivery slot queries.')
+  }
+  var body = {
+    operation: operation,
+    storeViewCode: deliverySlotStoreViewCode(args),
+    skus: skus
+  }
+  if (args.deliveryDateTime) body.deliveryDateTime = String(args.deliveryDateTime)
+  if (args.deliveryDateTimeSlot) body.deliveryDateTimeSlot = String(args.deliveryDateTimeSlot)
+  if (args.specialCartMode) body.specialCartMode = String(args.specialCartMode)
+  if (args.orderId) body.orderId = String(args.orderId)
+  if (args.categoryIds && args.categoryIds.length) {
+    body.categoryIds = args.categoryIds.map(function (id) { return String(id) })
+  }
+  return body
+}
+
+function resolveDeliverySlotQuery (context, args, operation) {
+  var secrets = secretsFrom(context)
+  var body = deliverySlotBodyFromArgs(args, operation, secrets)
+  return postJson(
+    secrets.LITTLEFARMS_DELIVERY_SLOT_STOREFRONT_URL,
+    '',
+    body,
+    { skipSecret: true }
+  ).then(mapDeliverySlotsPayload)
+}
+
+function mapSaveOrderDeliverySlotPayload (payload) {
+  payload = unwrapDeliverySlotActionPayload(payload || {})
+  var body = payload
+  if (payload.body && typeof payload.body === 'object') {
+    body = payload.body
+  }
+  return {
+    success: body.success === true,
+    orderNumber: body.orderNumber || '',
+    storeViewCode: body.storeViewCode || '',
+    bookingApplied: body.bookingApplied === true,
+    released: body.released === true,
+    skipped: body.skipped === true,
+    reason: body.reason || '',
+    path: body.path || ''
+  }
+}
+
+function resolveSaveOrderDeliverySlot (_root, args, context) {
+  var secrets = secretsFrom(context)
+  var body = {
+    operation: 'save-order-delivery-slot',
+    orderNumber: String(args.orderNumber || ''),
+    storeViewCode: deliverySlotStoreViewCode(args),
+    deliveryDateTime: String(args.deliveryDateTime || ''),
+    deliveryDateTimeSlot: String(args.deliveryDateTimeSlot || '')
+  }
+  if (args.deliverySlotPath) body.deliverySlotPath = String(args.deliverySlotPath)
+  return postJson(
+    secrets.LITTLEFARMS_DELIVERY_SLOT_STOREFRONT_URL,
+    '',
+    body,
+    { skipSecret: true }
+  ).then(mapSaveOrderDeliverySlotPayload)
+}
+
 var WEEK_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
 function mapDayHours (row) {
@@ -797,11 +922,29 @@ module.exports = {
             return (payload.items || []).map(mapBlogPostSummary).filter(Boolean)
           })
         }
+      },
+      littleFarmsDeliverySlots: {
+        resolve: function (_root, args, context) {
+          return resolveDeliverySlotQuery(context, args, 'slots-for-cart')
+        }
+      },
+      littleFarmsDeliverySlotValidate: {
+        resolve: function (_root, args, context) {
+          return resolveDeliverySlotQuery(context, args, 'validate-saved-slot')
+        }
+      },
+      littleFarmsDeliveryOrderSlots: {
+        resolve: function (_root, args, context) {
+          return resolveDeliverySlotQuery(context, args, 'slots-for-order')
+        }
       }
     },
     Mutation: {
       littleFarmsRecordBlogVisit: {
         resolve: resolveLittleFarmsRecordBlogVisit
+      },
+      littleFarmsSaveOrderDeliverySlot: {
+        resolve: resolveSaveOrderDeliverySlot
       }
     }
   }

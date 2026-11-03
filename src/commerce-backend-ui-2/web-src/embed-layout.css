@@ -1,0 +1,115 @@
+/**
+ * Commerce Admin iframe (html.lf-embed): no page gutters — host already insets content.
+ */
+
+/* Hide inner scrollbar; scroll still works via wheel/touch inside the iframe (host may show the only bar). */
+html.lf-embed .lf-app-main,
+html.lf-embed .lf-module-launcher,
+html.lf-embed .lf-module-launcher-body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html.lf-embed .lf-app-main::-webkit-scrollbar,
+html.lf-embed .lf-module-launcher::-webkit-scrollbar,
+html.lf-embed .lf-module-launcher-body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+html.lf-embed .lf-app-main main.conditional-blocks,
+html.lf-embed .lf-app-main .conditional-blocks {
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html.lf-embed .admin-list.conditional-blocks {
+  padding: 0;
+}
+
+html.lf-embed .admin-list-header {
+  padding: 8px 0 12px;
+}
+
+html.lf-embed .admin-list-band {
+  min-height: auto;
+  padding: 10px 0;
+}
+
+html.lf-embed .admin-list-body,
+html.lf-embed .lf-blog-module .admin-list-body,
+html.lf-embed .lf-blog-placeholder .admin-list-body {
+  padding: 0;
+}
+
+html.lf-embed .admin-search-row,
+html.lf-embed .admin-active-filters,
+html.lf-embed .admin-attribute-bar {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+html.lf-embed .admin-grid-card {
+  padding-top: 8px;
+}
+
+html.lf-embed .admin-post-edit.conditional-blocks,
+html.lf-embed .admin-post-edit.block-edit-page {
+  padding: 0;
+}
+
+html.lf-embed .block-edit-page .lf-section-layout-header {
+  padding: 10px 0;
+}
+
+html.lf-embed .block-edit-page .lf-section-content,
+html.lf-embed .location-edit-page .lf-section-layout-body .lf-section-content {
+  padding: 16px 0 24px;
+}
+
+html.lf-embed .lf-section-layout-header {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+html.lf-embed .lf-blog-module,
+html.lf-embed .lf-location-module {
+  padding: 0;
+}
+
+html.lf-embed .locations-page.conditional-blocks {
+  padding: 0;
+}
+
+html.lf-embed .admin-post-edit-header,
+html.lf-embed .admin-post-action-band {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+html.lf-embed .admin-post-sidebar {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+html.lf-embed .lf-delivery-config-sticky {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+html.lf-embed .lf-delivery-config-main {
+  padding: 24px 24px 48px;
+}
+
+html.lf-embed .lf-delivery-config-nav {
+  margin-left: 0;
+}
+
+html.lf-embed .lf-delivery-config-page {
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+  /* Match other modules: single scroll on .lf-app-main only (no nested overflow). */
+  overflow: visible;
+}
