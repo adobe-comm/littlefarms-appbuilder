@@ -15,7 +15,8 @@ async function main (params) {
         const prev = (current.weekdays[day] || [])[index]
         return {
           ...row,
-          bookedByDate: prev?.bookedByDate || row.bookedByDate || {}
+          bookedByDate:
+            row.bookedByDate != null ? row.bookedByDate : (prev?.bookedByDate || {})
         }
       })
     }

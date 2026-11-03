@@ -869,7 +869,7 @@ On **legacy PaaS**, **`LittleFarms_Sales`** (not the cart picker in `LittleFarms
 
 - [x] AppShell module **Delivery Slots** (`delivery-slot-management`) on Little Farms Admin
 - [x] Admin: regular weekday slots (start, end, max, booked read-only) — PaaS-style UI
-- [x] Admin: special events — enable, order window, weekday slots (**category offset grid UI deferred**; API/`special-write` supports `categoryOffsets`)
+- [x] Admin: special events — enable/disable, order window, **Delivery Days and Category** grid, weekday slots (booked JSON read-only)
 - [x] Runtime: admin, storefront, order-book, daily reset + Mesh resolvers
 - [x] Storefront contract doc — `docs/delivery-slot-storefront-contract.md`
 - [ ] **Deploy smoke** on target workspace (user-run): save/load admin, invoke storefront, order-book after place order

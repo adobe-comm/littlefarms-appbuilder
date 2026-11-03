@@ -93,19 +93,23 @@ html.lf-embed .admin-post-sidebar {
   padding-right: 0;
 }
 
-html.lf-embed .lf-delivery-config-page {
-  min-height: 0;
-}
-
 html.lf-embed .lf-delivery-config-sticky {
   padding-left: 0;
   padding-right: 0;
 }
 
 html.lf-embed .lf-delivery-config-main {
-  padding: 24px 0 48px;
+  padding: 24px 24px 48px;
 }
 
 html.lf-embed .lf-delivery-config-nav {
   margin-left: 0;
+}
+
+html.lf-embed .lf-delivery-config-page {
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+  /* Match other modules: single scroll on .lf-app-main only (no nested overflow). */
+  overflow: visible;
 }

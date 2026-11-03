@@ -5,10 +5,12 @@
   --lf-delivery-font-weight: 400;
   --lf-delivery-line-height: 19px;
   --lf-delivery-color: #222;
+  /* PaaS field-array inner table (~576px in td.value) */
+  --lf-delivery-array-table-width: 576px;
 
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  min-height: 0;
   font-family: var(--lf-delivery-font-family);
   font-size: var(--lf-delivery-font-size);
   font-weight: var(--lf-delivery-font-weight);
@@ -23,51 +25,34 @@
   font-family: inherit;
 }
 
-html.lf-embed .lf-delivery-config-page {
-  min-height: auto;
-}
-
 .lf-delivery-config-sticky {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   padding: 17px 30px;
   background: var(--paas-bg-body, #fff);
   border-bottom: 1px solid var(--paas-border-light, #e3e3e3);
 }
 
-.lf-delivery-config-scope {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.lf-delivery-config-scope strong {
-  font-size: var(--paas-font-size-label, 14px);
-  font-weight: var(--paas-font-weight-label, 600);
-}
-
-.lf-delivery-config-scope select {
-  min-width: 220px;
-  height: 32px;
-  padding: 4px 8px;
-}
-
 .lf-delivery-config-body {
-  display: flex;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
   align-items: stretch;
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .lf-delivery-config-nav {
-  width: 240px;
-  flex-shrink: 0;
+  grid-column: 1;
+  min-width: 0;
   padding: 16px 0 24px;
-  border-right: 1px solid var(--paas-border-light, #e3e3e3);
   background: #f5f5f5;
+  border-right: 1px solid var(--paas-border-light, #e3e3e3);
+  box-sizing: border-box;
 }
 
 .lf-delivery-config-nav-title {
@@ -104,9 +89,10 @@ html.lf-embed .lf-delivery-config-page {
 }
 
 .lf-delivery-config-main {
-  flex: 1;
+  grid-column: 2;
   min-width: 0;
   padding: 24px 30px 48px;
+  box-sizing: border-box;
   font-size: var(--lf-delivery-font-size);
   font-weight: var(--lf-delivery-font-weight);
   line-height: var(--lf-delivery-line-height);
@@ -159,6 +145,137 @@ html.lf-embed .lf-delivery-config-page {
 
 .lf-delivery-section-toggle.is-expanded .lf-delivery-section-toggle-icon {
   transform: rotate(180deg);
+}
+
+.lf-delivery-subsection-header-row td.label.lf-delivery-subsection-title-cell {
+  padding: 10px 15px 10px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.lf-delivery-subsection-header-row + tr td.label,
+.lf-delivery-subsection-header-row + tr td.value {
+  padding-top: 0;
+}
+
+.lf-delivery-subsection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.lf-delivery-subsection-bar .lf-delivery-section-toggle {
+  flex-shrink: 0;
+}
+
+.lf-delivery-subsection-title {
+  font-family: var(--lf-delivery-font-family);
+  font-size: var(--lf-delivery-font-size);
+  font-weight: 600;
+  line-height: var(--lf-delivery-line-height);
+  color: var(--lf-delivery-color);
+}
+
+.lf-delivery-subsection-label-spacer {
+  padding: 10px 15px 10px 0;
+}
+
+.lf-delivery-subsection-content-row td.value {
+  padding: 10px 0 28px;
+  vertical-align: top;
+}
+
+.lf-delivery-special-settings tr.lf-delivery-subsection-content-row:last-of-type td.value {
+  padding-bottom: 28px;
+}
+
+.lf-delivery-special-settings > tbody > tr:not(.lf-delivery-subsection-header-row):not(.lf-delivery-subsection-content-row) td.value > .admin__control-select,
+.lf-delivery-special-settings > tbody > tr:not(.lf-delivery-subsection-header-row):not(.lf-delivery-subsection-content-row) td.value > .admin__control-text {
+  min-width: 220px;
+}
+
+.lf-delivery-special-settings .lf-delivery-slots-array-panel .admin__control-select,
+.lf-delivery-special-settings .lf-delivery-slots-array-panel .admin__control-text {
+  min-width: 0;
+}
+
+.lf-delivery-config-main .lf-delivery-category-offset-grid {
+  width: var(--lf-delivery-array-table-width);
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.lf-delivery-category-offset-grid .lf-delivery-category-col-category {
+  width: 432px;
+}
+
+.lf-delivery-category-offset-grid .lf-delivery-category-col-offset {
+  width: 80px;
+}
+
+.lf-delivery-category-offset-grid .lf-delivery-category-col-action {
+  width: 64px;
+}
+
+.lf-delivery-config-main .lf-delivery-category-offset-grid thead th {
+  background-color: #eee;
+  border: none;
+  border-bottom: 1px solid #ccc;
+  color: var(--lf-delivery-color);
+  font-size: var(--lf-delivery-font-size);
+  font-weight: 700;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.lf-delivery-config-main .lf-delivery-category-offset-grid tbody td {
+  padding: 8px 10px;
+  vertical-align: middle;
+  border: 1px solid #adadad;
+  background: #eaeaea;
+}
+
+.lf-delivery-config-main .lf-delivery-category-offset-grid thead th:nth-child(3),
+.lf-delivery-config-main .lf-delivery-category-offset-grid tbody td:nth-child(3) {
+  text-align: center;
+}
+
+.lf-delivery-config-main .lf-delivery-category-offset-grid tbody td:nth-child(2) .admin__control-text {
+  width: 64px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.lf-delivery-config-main .lf-delivery-category-offset-grid tbody td:nth-child(1) {
+  min-width: 0;
+  overflow: visible;
+}
+
+.lf-delivery-config-main .lf-delivery-category-offset-grid .lf-delivery-slots-action-cell {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.lf-delivery-config-main .lf-delivery-category-select {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 28px 6px 10px;
+  box-sizing: border-box;
+  line-height: 1.4;
+  vertical-align: middle;
+  background-color: #fff;
+  border: 1px solid var(--paas-input-border, #adadad);
 }
 
 /* Magento system.xml form-list: td.label + td.value (see devtools on PaaS config) */
@@ -215,12 +332,19 @@ html.lf-embed .lf-delivery-config-page {
   box-sizing: border-box;
 }
 
-.lf-delivery-config-main .admin__control-table.lf-delivery-slot-grid {
-  width: auto;
+.lf-delivery-config-main .lf-delivery-slots-array-panel {
+  width: calc(var(--lf-delivery-array-table-width) + 50px);
   max-width: 100%;
-  table-layout: auto;
+  box-sizing: border-box;
+}
+
+.lf-delivery-config-main .admin__control-table.lf-delivery-slot-grid {
+  width: var(--lf-delivery-array-table-width);
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   margin: 0;
+  box-sizing: border-box;
 }
 
 /* PaaS field-array header: light grey bar, dark text, bottom border only (not data-grid black) */
@@ -296,6 +420,25 @@ html.lf-embed .lf-delivery-config-page {
   width: 64px;
 }
 
+/* Special events: wider Booked for JSON date maps (regular grid stays 64px). */
+.lf-delivery-config-main .lf-delivery-slot-grid--special {
+  width: calc(var(--lf-delivery-array-table-width) + 120px);
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid--special thead th:nth-child(4),
+.lf-delivery-config-main .lf-delivery-slot-grid--special tbody td:nth-child(4) {
+  min-width: 200px;
+}
+
+.lf-delivery-config-main .lf-delivery-slot-grid--special tbody td:nth-child(4) .lf-delivery-special-booked {
+  width: 200px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .lf-delivery-config-main .lf-delivery-slot-grid .lf-delivery-slots-action-cell {
   padding-right: 0;
   text-align: center;
@@ -332,27 +475,4 @@ html.lf-embed .lf-delivery-config-page {
 .lf-delivery-config-main .action-add.lf-delivery-slots-add-row:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.lf-delivery-slots-special-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px 24px;
-  margin-bottom: 24px;
-}
-
-.lf-delivery-slots-special-meta label {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.lf-delivery-slots-special-meta .lf-field-checkbox-row {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  font-weight: 400;
-  padding-top: 24px;
 }

@@ -199,9 +199,18 @@
 
 .lf-app-main .lf-delivery-section-bar h1 {
   margin-bottom: 0;
+  overflow-wrap: anywhere;
   font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 14px;
   font-weight: 400;
+  line-height: 19px;
+  color: #222;
+}
+
+.lf-app-main .lf-delivery-subsection-title {
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 19px;
   color: #222;
 }
