@@ -1,6 +1,7 @@
 const { createOperationRouter } = require('../../lib/operation-router')
+const { withCommerceCoreGraphqlUrl } = require('../../block/lib/enrich-commerce-params')
 
-exports.main = createOperationRouter({
+const dispatch = createOperationRouter({
   logName: 'delivery-slot-admin',
   handlers: {
     'regular-get': require('./regular-get'),
@@ -9,3 +10,8 @@ exports.main = createOperationRouter({
     'special-write': require('./special-write')
   }
 })
+
+exports.main = async function main (params) {
+  params = await withCommerceCoreGraphqlUrl(params)
+  return dispatch(params)
+}
